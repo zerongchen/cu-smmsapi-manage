@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="commandRecord">
+		<xs:annotation>
+			<xs:documentation>违法管理指令执行记录指令</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="commandId" type="xs:long">
+					<xs:annotation>
+						<xs:documentation>指令惟一ID，该ID由SMMS产生</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="idcId" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>IDC/ISP经营者ID</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="controlsId" type="xs:long">
+					<xs:annotation>
+						<xs:documentation>违法信息安全管理指令ID</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="timeStamp" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>生成该查询指令的时间</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

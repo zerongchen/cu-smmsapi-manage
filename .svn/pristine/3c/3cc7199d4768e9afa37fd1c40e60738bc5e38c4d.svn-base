@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:task="http://www.springframework.org/schema/task"
+	xsi:schemaLocation="
+			http://www.springframework.org/schema/beans 
+			http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+            http://www.springframework.org/schema/context 
+            http://www.springframework.org/schema/context/spring-context-3.0.xsd 
+            http://www.springframework.org/schema/task 
+            http://www.springframework.org/schema/task/spring-task-3.0.xsd
+            ">
+	<bean id="dealSmmsProcessResult" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="baseIDCWebService" />
+		<property name="targetMethod" value="dealSmmsProcessResult" />
+		<property name="concurrent" value="false" />
+	</bean>
+	<bean id="dealSmmsProcessResultTaskTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="dealSmmsProcessResult" />
+		<property name="cronExpression" value="5/30 * * * * ?" />
+	</bean>
+	
+	<bean id="createActiveStateTask" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="fileUpload" />
+		<property name="targetMethod" value="createActiveStateTask" />
+		<property name="concurrent" value="false" />
+	</bean>
+
+	<bean id="createActiveStateTaskTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="createActiveStateTask" />
+		<property name="cronExpression" value="1 0/10 * * * ?" />
+	</bean>
+	
+	<bean id="createActiveResourcesMonitorTask" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="fileUpload" />
+		<property name="targetMethod" value="createActiveResourcesMonitorTask" />
+		<property name="concurrent" value="false" />
+	</bean>
+	<bean id="createActiveResourcesMonitorTaskTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="createActiveResourcesMonitorTask" />
+		<property name="cronExpression" value="1 0 2 * * ?" />
+	</bean> 
+	
+	<bean id="createIllegalWebMonitorTask" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="fileUpload" />
+		<property name="targetMethod" value="createIllegalWebMonitorTask" />
+		<property name="concurrent" value="false" />
+	</bean>
+	<bean id="createIllegalWebMonitorTaskTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="createIllegalWebMonitorTask" />
+		<property name="cronExpression" value="1 0 3 * * ?" />
+	</bean>
+	
+	<bean id="createBasicMonitorTask" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="fileUpload" />
+		<property name="targetMethod" value="createBasicMonitorTask" />
+		<property name="concurrent" value="false" />
+	</bean>
+	<bean id="createBasicMonitorTaskTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="createBasicMonitorTask" />
+		<property name="cronExpression" value="1 0 4 * * ?" />
+	</bean>
+	
+	<bean id="preValidateTask" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="preValidate" />
+		<property name="targetMethod" value="handlePreValidate" />
+		<property name="concurrent" value="false" />
+	</bean>
+	<bean id="preValidateTaskTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="preValidateTask" />
+		<!--<property name="cronExpression" value="0/10 * * * * ?" />-->
+		<property name="cronExpression" value="0 0/10 * * * ?" />
+	</bean>
+	
+	
+	<bean id="baseIDCWebService_timer" class="org.springframework.scheduling.quartz.SchedulerFactoryBean">  
+        <property name="triggers">  
+            <list>  
+                <ref bean="dealSmmsProcessResultTaskTrigger" /> 
+                <ref bean="createActiveStateTaskTrigger" />  
+                <ref bean="createActiveResourcesMonitorTaskTrigger" />
+                <ref bean="createIllegalWebMonitorTaskTrigger" />
+                <ref bean="createBasicMonitorTaskTrigger" />  
+                <ref bean="preValidateTaskTrigger" />
+            </list>
+        </property>  
+    </bean> 
+
+</beans>
+

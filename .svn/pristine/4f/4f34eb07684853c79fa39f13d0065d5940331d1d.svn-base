@@ -1,0 +1,81 @@
+package com.aotain.smmsapi.task.utils;
+
+import java.util.Date;
+
+import com.aotain.common.utils.redis.DataApproveUtil;
+import com.aotain.cu.serviceapi.model.BaseModel;
+import com.aotain.cu.serviceapi.model.HouseInformation;
+import com.aotain.cu.serviceapi.model.IdcInformation;
+import com.aotain.cu.serviceapi.model.UserInformation;
+import com.aotain.cu.serviceapi.model.WaitApproveProcess;
+import com.aotain.cu.serviceapi.utils.BaseFeignBuilder;
+import com.aotain.smmsapi.task.interceptor.FeignBasicAuthRequestInterceptor;
+import com.aotain.smmsapi.task.serviceapi.WriteProcessService;
+import com.aotain.smmsapi.task.serviceapi.WriteProcessServiceCallback;
+
+public class WriteApproveProcess {
+
+    static String RIBBON_CLIENT_NAME = "myclient";
+    public static Integer APPROVE_TYPE_HOUSE=2;
+    public static Integer APPROVE_TYPE_IDC=1;
+    public static Integer APPROVE_TYPE_USER=3;
+    private WriteProcessService api;
+    private static volatile WriteApproveProcess instance = null;
+
+
+    private WriteApproveProcess(){
+        api = BaseFeignBuilder.getCacheFeign(WriteProcessService.class, RIBBON_CLIENT_NAME,new WriteProcessServiceCallback(), BaseFeignBuilder.EncodeDecodeType.EDT_JSON_JSON,new FeignBasicAuthRequestInterceptor());
+    }
+
+    public static WriteApproveProcess getInstance(){
+        if (instance==null){
+            synchronized (WriteApproveProcess.class){
+                instance = new WriteApproveProcess();
+            }
+        }
+        return instance;
+    }
+
+    public void writeProcess( WaitApproveProcess waitApproveProcess ) {
+        Long approveId = DataApproveUtil.getInstance().getDataApprove(waitApproveProcess.getType()+"_"+waitApproveProcess.getDataId());
+        if (approveId!=null){
+            api.write(waitApproveProcess);
+        }
+    }
+
+    public void write( BaseModel baseModel ) {
+        Date date = new Date();
+        WaitApproveProcess process = new WaitApproveProcess();
+        if(baseModel.getDealFlag()==null){
+            return;
+        }
+        if (baseModel.getSubmitId()!=null){
+            process.setSubmitId(baseModel.getSubmitId());
+        }
+        if (!StringUtil.isEmptyString(baseModel.getVerificationResult())){
+            process.setWarnData(baseModel.getVerificationResult());
+        }
+        if (baseModel.getCreateUserId()!=null){
+            process.setCreateUser(Long.valueOf(baseModel.getCreateUserId()));
+        }
+        process.setDealFlag(baseModel.getDealFlag());
+        process.setDealTime(DateUtils.getCurrentyyyMMddHHmmss());
+        process.setCreateTime(date);
+        process.setUpdateTime(date);
+        writeProcess(process);
+        if (baseModel instanceof IdcInformation){
+            IdcInformation idcInformation= (IdcInformation)baseModel;
+            process.setType(APPROVE_TYPE_IDC);
+            process.setDataId(Long.valueOf(idcInformation.getJyzId()));
+        }else if (baseModel instanceof HouseInformation){
+            HouseInformation houseInformation= (HouseInformation)baseModel;
+            process.setType(APPROVE_TYPE_HOUSE);
+            process.setDataId(Long.valueOf(houseInformation.getHouseId()));
+        }else if(baseModel instanceof UserInformation){
+            UserInformation userInformation= (UserInformation)baseModel;
+            process.setType(APPROVE_TYPE_USER);
+            process.setDataId(Long.valueOf(userInformation.getUserId()));
+        }
+    }
+
+}

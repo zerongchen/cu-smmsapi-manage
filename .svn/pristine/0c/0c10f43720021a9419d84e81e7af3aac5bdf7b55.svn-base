@@ -1,0 +1,4 @@
+package com.aotain.smmsapi.task.quartz;
+
+public class PreValidateService {
+}

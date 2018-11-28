@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.smmsreturn.mapper.OperatorTablesDao">
+	<delete id="deleteJyz">
+		<if test="jyzId == null">
+			 delete from IDC_ISMS_BASE_IDC				where 1=0
+		</if>
+		<if test="jyzId != null">
+			begin
+			delete from IDC_ISMS_BASE_HOUSE_IPSEG		where houseid in(select houseid from IDC_ISMS_BASE_HOUSE WHERE jyzid=#{jyzId});
+			delete from IDC_ISMS_BASE_HOUSE_FRAME		where houseid in(select houseid from IDC_ISMS_BASE_HOUSE WHERE jyzid=#{jyzId});
+			delete from IDC_ISMS_BASE_HOUSE_GATEWAY		where houseid in(select houseid from IDC_ISMS_BASE_HOUSE WHERE jyzid=#{jyzId});
+			delete from IDC_ISMS_BASE_USER_FRAME		where houseid in(select houseid from IDC_ISMS_BASE_HOUSE WHERE jyzid=#{jyzId});
+			delete from IDC_ISMS_BASE_HOUSE				where jyzid=#{jyzId};
+		    delete from IDC_ISMS_BASE_USER_HH			where userid in(SELECT userId FROM IDC_ISMS_BASE_USER WHERE JYZID = 68);
+		    delete from IDC_ISMS_BASE_USER_SERVICE		where userid in(SELECT userId FROM IDC_ISMS_BASE_USER WHERE JYZID = 68);
+		    delete from IDC_ISMS_BASE_SERVICE_DOMAIN	where userid in(SELECT userId FROM IDC_ISMS_BASE_USER WHERE JYZID = 68);
+		    delete from IDC_ISMS_BASE_SERVICE_VIRTUAL	where userid in(SELECT userId FROM IDC_ISMS_BASE_USER WHERE JYZID = 68);
+		    delete from IDC_ISMS_BASE_USER				where jyzid=#{jyzId};
+		    delete from IDC_ISMS_BASE_IDC				where jyzid=#{jyzId};
+		    end;
+		</if>
+	</delete>
+	<sql id="houseIdList">
+		<if test="houseIdList == null or houseIdList.size() == 0">
+			-1
+		</if>
+		<if test="houseIdList != null and houseIdList.size() > 0">
+			<foreach collection="houseIdList" item="val" separator=",">
+				#{val}
+			</foreach>
+		</if>
+	</sql>
+	
+	<sql id="condition_czlx">
+		and czlx=3
+	</sql>
+	
+	<delete id="deleteHouses">
+		begin
+			delete from IDC_ISMS_BASE_HOUSE_IPSEG		where  houseid in(<include refid="houseIdList"></include>) <include refid="condition_czlx"></include>;
+			delete from IDC_ISMS_BASE_USER_FRAME		where  houseid in(<include refid="houseIdList"></include>);
+			delete from IDC_ISMS_BASE_HOUSE_FRAME		where  houseid in(<include refid="houseIdList"></include>) <include refid="condition_czlx"></include>;
+			delete from IDC_ISMS_BASE_HOUSE_GATEWAY		where  houseid in(<include refid="houseIdList"></include>) <include refid="condition_czlx"></include>;
+			delete from IDC_ISMS_BASE_HOUSE				where  houseId in(<include refid="houseIdList"></include>) <include refid="condition_czlx"></include>;
+		end;
+	</delete>
+	
+	<sql id="del_house_children_condition_frame">
+		<if test="house.frameList == null or house.frameList.size == 0">
+			1=0
+		</if>
+		<if test="house.frameList != null and house.frameList.size > 0">
+			houseid=#{house.houseId} and czlx=3 and frameid in(
+			<foreach collection="house.frameList" item="frame" separator=",">
+					#{frame.frameId}
+			</foreach>
+			)
+		</if>
+	</sql>
+	
+	<sql id="del_house_children_condition_ipseg">
+		<if test="house.ipSegList == null or house.ipSegList >== 0">
+			1=0
+		</if>
+		<if test="house.ipSegList != null and house.ipSegList > 0">
+			houseid=#{house.houseId} and czlx=3 and ipsegid in(
+			<foreach collection="house.ipSegList" item="ipseg" separator=",">
+					#{ipseg.ipSegId}
+			</foreach>
+			)
+		</if>
+	</sql>
+	
+	<sql id="del_house_children_condition_gateway">
+		<if test="house.gatewayInfoList == null or house.gatewayInfoList == 0">
+			1=0
+		</if>
+		<if test="house.gatewayInfoList != null and house.gatewayInfoList > 0">
+			houseid=#{house.houseId} and czlx=3 and gatewayid in(
+			<foreach collection="house.gatewayInfoList" item="gateway" separator=",">
+					#{gateway.gatewayId}
+			</foreach>
+			)
+		</if>
+	</sql>
+	
+	<delete id="deleteHouseChildren" parameterType="com.aotain.cu.serviceapi.model.HouseInformation">
+		begin
+			delete from IDC_ISMS_BASE_HOUSE where 1=0;
+			<if test="houseList != null and houseList.size > 0">
+				<foreach collection="houseList" item="house">
+					delete from IDC_ISMS_BASE_HOUSE_IPSEG		where  <include refid="del_house_children_condition_ipseg"></include>;
+					delete from IDC_ISMS_BASE_USER_FRAME		where  frameid in(select frameid from IDC_ISMS_BASE_HOUSE_FRAME where <include refid="del_house_children_condition_frame"></include>);
+					delete from IDC_ISMS_BASE_HOUSE_FRAME		where  <include refid="del_house_children_condition_frame"></include>;
+					delete from IDC_ISMS_BASE_HOUSE_GATEWAY		where  <include refid="del_house_children_condition_gateway"></include>;
+				</foreach>
+			</if>
+		end;
+	</delete>
+	
+	<sql id="userListStr">
+		<if test="userIdList == null or userIdList.size() == 0">
+			-1
+		</if>
+		<if test="userIdList != null and userIdList.size() > 0">
+			<foreach collection="userIdList" item="val" separator=",">
+				#{val}
+			</foreach>
+		</if>
+	</sql>
+	
+	<delete id="deleteUsers">
+		begin
+			delete from IDC_ISMS_BASE_USER_HH			where userid in(<include refid="userListStr"></include>) <include refid="condition_czlx"></include>;
+		    delete from IDC_ISMS_BASE_USER_SERVICE		where userid in(<include refid="userListStr"></include>) <include refid="condition_czlx"></include>;
+		    delete from IDC_ISMS_BASE_SERVICE_DOMAIN	where userid in(<include refid="userListStr"></include>) <include refid="condition_czlx"></include>;
+		    delete from IDC_ISMS_BASE_SERVICE_VIRTUAL	where userid in(<include refid="userListStr"></include>) <include refid="condition_czlx"></include>;
+		    delete from IDC_ISMS_BASE_USER				where userid in(<include refid="userListStr"></include>) <include refid="condition_czlx"></include>;
+		end;
+	</delete>
+	
+	<sql id="del_user_children_condition_hh">
+		<if test="user.bandwidthList == null or user.bandwidthList.size == 0">
+			1=0
+		</if>
+		<if test="user.bandwidthList != null and user.bandwidthList > 0">
+			userid=#{user.userId} and czlx=3 and hhid in(
+			<foreach collection="user.bandwidthList" item="hh" separator=",">
+					#{hh.hhId}
+			</foreach>
+			)
+		</if>
+	</sql>
+	
+	<sql id="del_user_children_condition_service">
+		<if test="user.serviceList == null or user.serviceList == 0">
+			1=0
+		</if>
+		<if test="user.serviceList != null and user.serviceList > 0">
+			userid=#{user.userId} and czlx=3 and serviceid in(
+			<foreach collection="user.serviceList" item="service" separator=",">
+					#{service.serviceId}
+			</foreach>
+			)
+		</if>
+	</sql>
+	
+	<sql id="del_user_children_condition_domain">
+		<if test="user.serviceList == null or user.serviceList == 0">
+			1=0
+		</if>
+		<if test="user.serviceList != null and user.serviceList > 0">
+			userid=#{user.userId} and czlx=3 and domainid in (
+			<foreach collection="user.serviceList" item="service" separator=",">
+					<if test="service.domainList == null or service.domainList.size == 	0">
+						-1
+					</if>
+					<if test="service.domainList == null and service.domainList.size > 0">
+						<foreach collection="service.domainList" item="domain">
+							#{domain.domainId}
+						</foreach>
+					</if>
+			</foreach>
+			)
+		</if>
+	</sql>
+	
+	<sql id="del_user_children_condition_virtual">
+		<if test="user.virtualList == null or user.virtualList == 0">
+			1=0
+		</if>
+		<if test="user.virtualList != null and user.virtualList > 0">
+			userid=#{user.userId} and czlx=3 and vitualid in(
+			<foreach collection="user.virtualList" item="virtual" separator=",">
+					#{virtual.virtualId}
+			</foreach>
+			)
+		</if>
+	</sql>
+	
+	<delete id="deleteUserChildren" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+		begin
+			delete from IDC_ISMS_BASE_USER where 1=0;
+			<if test="userList != null and userList > 0">
+				<foreach collection="userList" item="user">
+					delete from IDC_ISMS_BASE_USER_HH			where <include refid="del_user_children_condition_hh"></include>;
+					<!-- 删除服务，直接删掉服务下的所有域名 -->
+		    		delete from IDC_ISMS_BASE_SERVICE_DOMAIN	where serviceid in(SELECT serviceid FROM idc_Isms_Base_User_Service WHERE <include refid="del_user_children_condition_service"></include>);
+		    		delete from IDC_ISMS_BASE_USER_SERVICE		where <include refid="del_user_children_condition_service"></include>;
+		    		<!-- 仅删除服务下的域名 -->
+		    		delete from IDC_ISMS_BASE_SERVICE_DOMAIN	where <include refid="del_user_children_condition_domain"></include>;
+		    		delete from IDC_ISMS_BASE_SERVICE_VIRTUAL	where <include refid="del_user_children_condition_virtual"></include>;
+				</foreach>
+			</if>
+		end;
+	</delete>
+</mapper>

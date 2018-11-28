@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.aotain.smmsapi.task.prevalidate.mapper.PreValidateIdcDao">
+
+	<resultMap id="JyzInfoMap" type="com.aotain.cu.serviceapi.model.IdcInformation">
+        <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+        <result column="IDCID" jdbcType="VARCHAR" property="idcId" />
+        <result column="IDCNAME" jdbcType="VARCHAR" property="idcName" />
+        <result column="IDCADD" jdbcType="VARCHAR" property="idcAddress" />
+        <result column="IDCZIP" jdbcType="VARCHAR" property="idcZipCode" />
+        <result column="CORP" jdbcType="VARCHAR" property="corporater" />
+        <result column="OFFICER_NAME" jdbcType="VARCHAR" property="officerName" />
+        <result column="OFFICER_IDTYPE" jdbcType="DECIMAL" property="officerIdType" />
+        <result column="OFFICER_ID" jdbcType="DECIMAL" property="officerId" />
+        <result column="OFFICER_EMAIL" jdbcType="VARCHAR" property="officerEmail" />
+        <result column="OFFICER_TEL" jdbcType="VARCHAR" property="officerTelephone" />
+        <result column="OFFICER_MOBILE" jdbcType="VARCHAR" property="officerMobile" />
+        <result column="EC_NAME" jdbcType="VARCHAR" property="ecName" />
+        <result column="EC_IDTYPE" jdbcType="DECIMAL" property="ecIdType" />
+        <result column="EC_ID" jdbcType="VARCHAR" property="ecId" />
+        <result column="EC_TEL" jdbcType="VARCHAR" property="ecTelephone" />
+        <result column="EC_MOBILE" jdbcType="VARCHAR" property="ecMobile" />
+        <result column="EC_EMAIL" jdbcType="VARCHAR" property="ecEmail" />
+        <result column="HOUSENUMBER" jdbcType="DECIMAL" property="houseNum" />
+        <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+        <result column="DEAL_FLAG" jdbcType="DECIMAL" property="dealFlag" />
+        <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+        <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+        <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+        <result column="INFO_COMPLETE" jdbcType="VARCHAR" property="infoComplete" />
+        <result column="REPORT_TYPE" jdbcType="DECIMAL" property="reportType" />
+        <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+        <collection property="houseList" ofType="com.aotain.cu.serviceapi.model.HouseInformation" column="{jyzId=JYZID,reportType=REPORT_TYPE}" select="getHouseList" />
+        <collection property="userList" ofType="com.aotain.cu.serviceapi.model.UserInformation" column="{jyzId=JYZID,reportType=REPORT_TYPE}" select="getUserList" />
+    </resultMap>
+    
+    <sql id="BASE_SQL">
+      JYZID,IDCID,IDCNAME,IDCADD,IDCZIP,CORP,OFFICER_NAME,OFFICER_IDTYPE,OFFICER_ID,OFFICER_TEL,OFFICER_MOBILE,OFFICER_EMAIL,EC_NAME,EC_IDTYPE,EC_ID,EC_TEL,EC_MOBILE,EC_EMAIL,HOUSENUMBER,
+      CZLX,DEAL_FLAG,CREATE_TIME,UPDATE_TIME,CREATE_USERID,INFO_COMPLETE,DEL_FLAG,REPORT_TYPE,UPDATE_USERID
+    </sql>
+    
+	<select id="getValidateIdcList" resultMap="JyzInfoMap" parameterType="com.aotain.cu.serviceapi.model.IdcInformation">
+      SELECT <include refid="BASE_SQL" />
+      FROM IDC_ISMS_BASE_IDC t
+      WHERE 1=1
+          <if test="dealFlag!=null">
+              AND DEAL_FLAG=#{dealFlag}
+          </if>
+    </select>
+    
+    <select id="getHouseList" parameterType="java.util.Map" resultType="com.aotain.cu.serviceapi.model.HouseInformation">
+        <choose>
+            <when test="reportType!=null and reportType==0">
+                SELECT
+                t.JYZID as jyzId,
+                t.HOUSEID as houseId,
+                t.DEAL_FLAG AS dealFlag
+                from IDC_ISMS_BASE_HOUSE t
+                WHERE (t.DEAL_FLAG=2 or t.DEAL_FLAG=0)AND JYZID=#{jyzId}
+            </when>
+            <otherwise>
+                SELECT NULL as jyzId ,null as houseId,null as dealFlag  FROM dual where rownum=0
+            </otherwise>
+        </choose>
+     
+    </select>
+    
+    <select id="getUserList" parameterType="java.util.Map" resultType="com.aotain.cu.serviceapi.model.UserInformation">
+        <choose>
+            <when test="reportType!=null and reportType==0">
+                SELECT
+                t.JYZID as jyzId,
+                t.USERID as userId,
+                t.DEAL_FLAG AS dealFlag
+                from IDC_ISMS_BASE_USER t
+                WHERE (t.DEAL_FLAG=2 or t.DEAL_FLAG=0) AND JYZID=#{jyzId}
+            </when>
+            <otherwise>
+                SELECT NULL AS jyzId,NULL AS userId ,NULL AS  dealFlag FROM dual where rownum=0
+            </otherwise>
+        </choose>
+    </select>
+    
+    <select id="jyzNum" resultType="java.lang.Integer" parameterType="com.aotain.cu.serviceapi.model.IdcInformation">
+    SELECT count(1) from RPT_ISMS_BASE_IDC t
+        WHERE 1=1
+        <if test="jyzId!=null">
+            AND JYZID=#{jyzId}
+        </if>
+        <if test="idcId!=null">
+            AND IDCID=#{idcId}
+        </if>
+        <if test="idcName!=null">
+            AND IDCNAME=#{idcName}
+        </if>
+    </select>
+    
+    <update id="submitJyz" parameterType="com.aotain.cu.serviceapi.model.IdcInformation">
+        UPDATE IDC_ISMS_BASE_IDC
+        <set>
+            <if test="dealFlag!=null">
+                DEAL_FLAG=#{dealFlag},
+            </if>
+            <if test="operateType!=null">
+                CZLX = #{operateType},
+            </if>
+            <if test="verificationResult!=null">
+                VERIFICATION_RESULT = #{verificationResult},
+            </if>
+            UPDATE_TIME=sysdate,
+        </set>
+        where JYZID=#{jyzId}
+    </update>
+    
+    <update id="submitHoset" parameterType="com.aotain.cu.serviceapi.model.HouseInformation">
+        UPDATE IDC_ISMS_BASE_HOUSE
+        <set>
+            <if test="dealFlag!=null">
+                DEAL_FLAG=#{dealFlag},
+            </if>
+            UPDATE_TIME=sysdate,
+        </set>
+        WHERE HOUSEID=#{houseId}
+    </update>
+    
+    <update id="submitUser" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+        UPDATE IDC_ISMS_BASE_USER
+        <set>
+            <if test="dealFlag!=null">
+                DEAL_FLAG=#{dealFlag},
+            </if>
+            UPDATE_TIME=sysdate,
+        </set>
+        WHERE USERID=#{userId}
+    </update>
+    
+    <insert id="writeIdcLog" parameterType="com.aotain.cu.serviceapi.model.IdcInformation">
+        INSERT INTO WAIT_ISMS_BASE_IDC
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="submitId!=null">
+                SUBMIT_ID,
+            </if>
+            <if test="jyzId != null">
+                jyzid,
+            </if>
+            <if test="idcId != null">
+                idcid,
+            </if>
+            <if test="idcName != null">
+                idcname,
+            </if>
+            <if test="idcAddress != null">
+                idcadd,
+            </if>
+            <if test="idcZipCode != null">
+                idczip,
+            </if>
+            <if test="corporater != null">
+                corp,
+            </if>
+            <if test="officerName != null">
+                officer_name,
+            </if>
+            <if test="officerIdType != null">
+                officer_idtype,
+            </if>
+            <if test="officerId != null">
+                officer_id,
+            </if>
+            <if test="officerTelephone != null">
+                officer_tel,
+            </if>
+            <if test="officerMobile != null">
+                officer_mobile,
+            </if>
+            <if test="officerEmail != null">
+                officer_email,
+            </if>
+            <if test="ecName != null">
+                ec_name,
+            </if>
+            <if test="ecIdType != null">
+                ec_idtype,
+            </if>
+            <if test="ecId != null">
+                ec_id,
+            </if>
+            <if test="ecTelephone != null">
+                ec_tel,
+            </if>
+            <if test="ecMobile != null">
+                ec_mobile,
+            </if>
+            <if test="ecEmail != null">
+                ec_email,
+            </if>
+            <if test="createTime != null">
+                create_time,
+            </if>
+            <if test="updateTime != null">
+                update_time,
+            </if>
+            <if test="createUserId != null">
+                CREATE_USERID,
+            </if>
+            <if test="updateUserId != null">
+                UPDATE_USERID,
+            </if>
+            <if test="operateType!=null">
+                CZLX,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="submitId!=null">
+                #{submitId},
+            </if>
+            <if test="jyzId != null">
+                #{jyzId},
+            </if>
+            <if test="idcId != null">
+                #{idcId},
+            </if>
+            <if test="idcName != null">
+                #{idcName},
+            </if>
+            <if test="idcAddress != null">
+                #{idcAddress},
+            </if>
+            <if test="idcZipCode != null">
+                #{idcZipCode},
+            </if>
+            <if test="corporater != null">
+                #{corporater},
+            </if>
+            <if test="officerName != null">
+                #{officerName},
+            </if>
+            <if test="officerIdType != null">
+                #{officerIdType},
+            </if>
+            <if test="officerId != null">
+                #{officerId},
+            </if>
+            <if test="officerTelephone != null">
+                #{officerTelephone},
+            </if>
+            <if test="officerMobile != null">
+                #{officerMobile},
+            </if>
+            <if test="officerEmail != null">
+                #{officerEmail},
+            </if>
+            <if test="ecName != null">
+                #{ecName},
+            </if>
+            <if test="ecIdType != null">
+                #{ecIdType},
+            </if>
+            <if test="ecId != null">
+                #{ecId},
+            </if>
+            <if test="ecTelephone != null">
+                #{ecTelephone},
+            </if>
+            <if test="ecMobile != null">
+                #{ecMobile},
+            </if>
+            <if test="ecEmail != null">
+                #{ecEmail},
+            </if>
+            <if test="createTime != null">
+                #{createTime},
+            </if>
+            <if test="updateTime != null">
+                #{updateTime},
+            </if>
+            <if test="createUserId != null">
+                #{createUserId},
+            </if>
+            <if test="updateUserId != null">
+                #{updateUserId},
+            </if>
+            <if test="operateType!=null">
+                #{operateType},
+            </if>
+        </trim>
+        
+    </insert>
+    
+    <update id="setUnvalObj2Val">
+        UPDATE IDC_ISMS_BASE_HOUSE set DEAL_FLAG=2 where DEAL_FLAG=0;
+        UPDATE IDC_ISMS_BASE_HOUSE_FRAME set DEAL_FLAG=2 where DEAL_FLAG=0;
+        UPDATE Idc_Isms_Base_House_Ipseg set DEAL_FLAG=2 where DEAL_FLAG=0;
+        UPDATE IDC_ISMS_BASE_USER set DEAL_FLAG=2 where DEAL_FLAG=0;
+        UPDATE IDC_ISMS_BASE_USER_HH set DEAL_FLAG=2 where DEAL_FLAG=0;
+        UPDATE IDC_ISMS_BASE_SERVICE_VIRTUAL set DEAL_FLAG=2 where DEAL_FLAG=0;
+        UPDATE IDC_ISMS_BASE_USER_SERVICE set DEAL_FLAG=2 where DEAL_FLAG=0;
+        UPDATE IDC_ISMS_BASE_SERVICE_DOMAIN set DEAL_FLAG=2 where DEAL_FLAG=0;
+    </update>
+	
+</mapper>

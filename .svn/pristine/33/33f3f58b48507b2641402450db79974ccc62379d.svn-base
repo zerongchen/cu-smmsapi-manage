@@ -1,0 +1,39 @@
+# 定时任务线程监控配置
+tmonitor.threads=dealrs,astate,aresource,illweb,basic
+
+# 1. 管局文件上报结果处理线程
+tmonitor.thread.dealrs.key=TM_DEAL_RESULT
+# 定时任务接口类
+tmonitor.thread.dealrs.type=com.aotain.smmsapi.task.quartz.DealResultService
+# 定时任务函数名
+tmonitor.thread.dealrs.method=dealSmmsProcessResult
+# 任务执行时间隔，单位秒(30秒+10秒)
+tmonitor.thread.dealrs.interval=40
+
+# 2. 活跃资源主动上报
+tmonitor.thread.astate.key=TM_ACTIVE_STATE
+tmonitor.thread.astate.type=com.aotain.smmsapi.task.quartz.FileUploadService
+tmonitor.thread.astate.method=createActiveStateTask
+# 10分钟+1分钟
+tmonitor.thread.astate.interval=660
+
+# 3. 活跃资源主动上报
+tmonitor.thread.aresource.key=TM_ACTIVE_RESOURCE
+tmonitor.thread.aresource.type=com.aotain.smmsapi.task.quartz.FileUploadService
+tmonitor.thread.aresource.method=createActiveResourcesMonitorTask
+# 24小时+10分钟
+tmonitor.thread.aresource.interval=87000
+
+# 3. 违法网站主动上报
+tmonitor.thread.illweb.key=TM_ILLEGAL_WEB
+tmonitor.thread.illweb.type=com.aotain.smmsapi.task.quartz.FileUploadService
+tmonitor.thread.illweb.method=createIllegalWebMonitorTask
+# 24小时+10分钟
+tmonitor.thread.illweb.interval=87000
+
+# 3. 基础数据异常主动上报
+tmonitor.thread.basic.key=TM_BASIC_MONITOR
+tmonitor.thread.basic.type=com.aotain.smmsapi.task.quartz.FileUploadService
+tmonitor.thread.basic.method=createBasicMonitorTask
+# 24小时+10分钟
+tmonitor.thread.basic.interval=87000

@@ -1,0 +1,770 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.prevalidate.mapper.PreValidateUserDao">
+  <resultMap id="BaseResultMap" type="com.aotain.cu.serviceapi.model.UserInformation">
+    <id column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="USERCODE" jdbcType="VARCHAR" property="userCode" />
+    <result column="NATURE" jdbcType="DECIMAL" property="nature" />
+    <result column="UNITNAME" jdbcType="VARCHAR" property="unitName" />
+    <result column="UNITNATURE" jdbcType="DECIMAL" property="unitNature" />
+    <result column="IDTYPE" jdbcType="DECIMAL" property="idType" />
+    <result column="IDNUMBER" jdbcType="VARCHAR" property="idNumber" />
+    <result column="OFFICER_EMAIL" jdbcType="VARCHAR" property="officerEmail" />
+    <result column="OFFICER_MOBILE" jdbcType="VARCHAR" property="officerMobile" />
+    <result column="OFFICER_TEL" jdbcType="VARCHAR" property="officerTelphone" />
+    <result column="OFFICER_ID" jdbcType="VARCHAR" property="officerId" />
+    <result column="OFFICER_IDTYPE" jdbcType="DECIMAL" property="officerIdType" />
+    <result column="OFFICER_NAME" jdbcType="VARCHAR" property="officerName" />
+    <result column="UNITADD" jdbcType="VARCHAR" property="unitAddress" />
+    <result column="ZIPCODE" jdbcType="VARCHAR" property="unitZipCode" />
+    <result column="REGISTERTIME" jdbcType="VARCHAR" property="registeTime" />
+    <result column="SERVERREGISTERTIME" jdbcType="VARCHAR" property="serviceRegTime" />
+    <result column="DEAL_FLAG" jdbcType="DECIMAL" property="dealFlag" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="INFO_COMPLETE" jdbcType="VARCHAR" property="infoComplete" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+    <result column="CLIENTID" jdbcType="VARCHAR" property="clientId" />
+    <result column="UNITADDPROVINCEC" jdbcType="VARCHAR" property="unitAddressProvinceCode" />
+    <result column="UNITADDPROVINCEN" jdbcType="VARCHAR" property="unitAddressProvinceName" />
+    <result column="UNITADDCITYC" jdbcType="VARCHAR" property="unitAddressCityCode" />
+    <result column="UNITADDCITYN" jdbcType="VARCHAR" property="unitAddressCityName" />
+    <result column="UNITADDAREAC" jdbcType="VARCHAR" property="unitAddressAreaCode" />
+    <result column="UNITADDAREAN" jdbcType="VARCHAR" property="unitAddressAreaName" />
+    <result column="SUBORDINATEUNIT_AREACODE" jdbcType="VARCHAR" property="areaCode" />
+    <result column="IDENTIFY" jdbcType="DECIMAL" property="identity" />
+    <collection property="bandwidthList" column="USERID" select="getBandWidth"></collection>
+    <collection property="serviceList" column="USERID" select="getUserService"></collection>
+    <collection property="virtualList" column="USERID" select="getVirtualList"></collection>
+  </resultMap>
+
+  <resultMap id="BaseBandResultMap" type="com.aotain.cu.serviceapi.model.UserBandwidthInformation">
+    <id column="HHID" jdbcType="DECIMAL" property="hhId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="DISTRIBUTETIME" jdbcType="VARCHAR" property="distributeTime" />
+    <result column="BANDWIDTH" jdbcType="DECIMAL" property="bandWidth" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="DEAL_FLAG" jdbcType="DECIMAL" property="dealFlag" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+  </resultMap>
+  <select id="getBandWidth" parameterType="java.lang.Long" resultMap="BaseBandResultMap">
+    select
+    HHID, USERID, HOUSEID, DISTRIBUTETIME, BANDWIDTH, CREATE_TIME, UPDATE_TIME, CREATE_USERID,
+    UPDATE_USERID,DEAL_FLAG,CZLX
+    from IDC_ISMS_BASE_USER_HH
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+  
+  <resultMap id="BaseServiceResultMap" type="com.aotain.cu.serviceapi.model.UserServiceInformation">
+    <id column="SERVICEID" jdbcType="DECIMAL" property="serviceId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="SERVICECONTENT" jdbcType="VARCHAR" property="serviceContent" />
+    <result column="REGID" jdbcType="VARCHAR" property="registerId" />
+    <result column="SETMODE" jdbcType="DECIMAL" property="setmode" />
+    <result column="SERVICETYPE" jdbcType="DECIMAL" property="serviceType" />
+    <result column="BUSINESS" jdbcType="DECIMAL" property="business" />
+    <result column="REGTYPE" jdbcType="DECIMAL" property="regType" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+    <result column="SUBORDINATEUNIT_AREACODE" jdbcType="VARCHAR" property="areaCode" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <collection property="domainList" column="SERVICEID" select="getDomainList"></collection>
+  </resultMap>
+  <select id="getUserService" parameterType="java.lang.Long" resultMap="BaseServiceResultMap">
+    select
+    SERVICEID, USERID, SERVICECONTENT, REGID, SETMODE,SERVICETYPE, BUSINESS, REGTYPE, CREATE_TIME,
+    UPDATE_TIME, CREATE_USERID, UPDATE_USERID,CZLX,SUBORDINATEUNIT_AREACODE
+    from IDC_ISMS_BASE_USER_SERVICE
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+  
+  <resultMap id="BaseDmoanResultMap" type="com.aotain.cu.serviceapi.model.ServiceDomainInformation">
+    <id column="DOMAINID" jdbcType="DECIMAL" property="domainId" />
+    <result column="SERVICEID" jdbcType="DECIMAL" property="serviceId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="DOMAINNAME" jdbcType="VARCHAR" property="domainName" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USER_ID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+  </resultMap>
+  <select id="getDomainList" parameterType="java.lang.Long" resultMap="BaseDmoanResultMap">
+    select
+    DOMAINID, SERVICEID,USERID, DOMAINNAME,CZLX, CREATE_TIME, UPDATE_TIME, CREATE_USER_ID, UPDATE_USERID
+    from IDC_ISMS_BASE_SERVICE_DOMAIN
+    where SERVICEID = #{serviceId,jdbcType=DECIMAL}
+  </select>
+  
+  <resultMap id="BaseVirtualResultMap" type="com.aotain.cu.serviceapi.model.UserVirtualInformation">
+    <id column="VIRTUALID" jdbcType="DECIMAL" property="virtualId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="VIRTUALHOST_NAME" jdbcType="VARCHAR" property="name" />
+    <result column="VIRTUALHOST_STATE" jdbcType="DECIMAL" property="status" />
+    <result column="VIRTUALHOST_TYPE" jdbcType="DECIMAL" property="type" />
+    <result column="NETWORK_ADDRESS" jdbcType="VARCHAR" property="networkAddress" />
+    <result column="MGN_ADDRESS" jdbcType="OTHER" property="mgnAddress" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+  </resultMap>
+  
+  <select id="getVirtualList" parameterType="java.lang.Long" resultMap="BaseVirtualResultMap">
+    select
+    VIRTUALID, USERID, HOUSEID, VIRTUALHOST_NAME, VIRTUALHOST_STATE, VIRTUALHOST_TYPE,
+    NETWORK_ADDRESS, MGN_ADDRESS, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID,CZLX
+    from IDC_ISMS_BASE_SERVICE_VIRTUAL
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+
+  <sql id="Base_Column_List">
+    USERID, JYZID,USERCODE, NATURE, UNITNAME, UNITNATURE, IDTYPE, IDNUMBER, OFFICER_EMAIL, OFFICER_MOBILE,
+    OFFICER_TEL, OFFICER_ID, OFFICER_IDTYPE, OFFICER_NAME, UNITADD, ZIPCODE, REGISTERTIME, 
+    SERVERREGISTERTIME, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID,DEAL_FLAG,CZLX,IDENTIFY
+  </sql>
+  <select id="getValidateUserList" parameterType="com.aotain.cu.serviceapi.model.UserInformation" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from IDC_ISMS_BASE_USER
+    WHERE 1=1
+    <choose>
+      <when test="dealFlag!=null">
+        AND DEAL_FLAG=#{dealFlag}
+      </when>
+      <otherwise>
+        AND DEAL_FLAG=2
+      </otherwise>
+    </choose>
+    <if test="userId!=null">
+      AND USERID=#{userId}
+    </if>
+    <if test="jyzId!=null">
+      AND JYZID=#{jyzId}
+    </if>
+  </select>
+  
+  <select id="getPreHouse" parameterType="com.aotain.cu.serviceapi.model.UserInformation" resultType="com.aotain.cu.serviceapi.model.HouseInformation">
+    <choose>
+      <when test="bandwidthList!=null and bandwidthList.size()>0">
+        SELECT
+        HOUSEID as houseId,
+        jyzId as jyzId,
+        HOUSEIDSTR as houseIdStr,
+        HOUSENAME AS houseName,
+        HOUSETYPE AS houseType,
+        DEAL_FLAG as dealFlag,
+        CZLX AS operateType
+        FROM IDC_ISMS_BASE_HOUSE
+        WHERE 1=1 AND HOUSEID IN (
+        <foreach collection="bandwidthList" item="item" separator="," >
+          #{item.houseId}
+        </foreach>
+        )
+      </when>
+      <otherwise>
+        select NULL AS houseId ,NULL AS jyzId ,NULL AS houseIdStr,NULL AS houseName,
+        NULL AS houseType,NULL AS dealFlag,NULL AS operateType from dual where rownum=0
+      </otherwise>
+    </choose>
+  </select>
+  
+  <select id="userNum" resultType="java.lang.Integer" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    SELECT count(1) from RPT_ISMS_BASE_USER t
+    WHERE 1=1
+    <if test="userId">
+      AND USERID=#{userId}
+    </if>
+    <if test="unitName!=null">
+      AND UNITNAME=#{unitName}
+    </if>
+    <if test="idType!=null">
+      AND IDTYPE=#{idType}
+    </if>
+    <if test="idNumber!=null">
+      AND IDNUMBER=#{idNumber}
+    </if>
+    <if test="jyzId!=null">
+      AND JYZID=#{jyzId}
+    </if>
+  </select>
+  
+  <update id="submitUser" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    UPDATE IDC_ISMS_BASE_USER
+    <set>
+      <if test="dealFlag!=null">
+        DEAL_FLAG=#{dealFlag},
+      </if>
+      <if test="verificationResult!=null">
+        VERIFICATION_RESULT=#{verificationResult}
+      </if>
+    </set>
+    WHERE USERID=#{userId}
+    and DEAL_FLAG!=0
+  </update>
+  
+  <resultMap id="RptBaseResultMap" type="com.aotain.cu.serviceapi.model.UserInformation">
+    <id column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="NATURE" jdbcType="DECIMAL" property="nature" />
+    <result column="UNITNAME" jdbcType="VARCHAR" property="unitName" />
+    <result column="UNITNATURE" jdbcType="DECIMAL" property="unitNature" />
+    <result column="IDTYPE" jdbcType="DECIMAL" property="idType" />
+    <result column="IDNUMBER" jdbcType="VARCHAR" property="idNumber" />
+    <result column="OFFICER_EMAIL" jdbcType="VARCHAR" property="officerEmail" />
+    <result column="OFFICER_MOBILE" jdbcType="VARCHAR" property="officerMobile" />
+    <result column="OFFICER_TEL" jdbcType="VARCHAR" property="officerTelphone" />
+    <result column="OFFICER_ID" jdbcType="VARCHAR" property="officerId" />
+    <result column="OFFICER_IDTYPE" jdbcType="DECIMAL" property="officerIdType" />
+    <result column="OFFICER_NAME" jdbcType="VARCHAR" property="officerName" />
+    <result column="UNITADD" jdbcType="VARCHAR" property="unitAddress" />
+    <result column="ZIPCODE" jdbcType="VARCHAR" property="unitZipCode" />
+    <result column="REGISTERTIME" jdbcType="VARCHAR" property="registeTime" />
+    <result column="SERVERREGISTERTIME" jdbcType="VARCHAR" property="serviceRegTime" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <collection property="bandwidthList" column="USERID" select="getRptBandWidth"></collection>
+  </resultMap>
+  
+  <select id="getRptHouse" resultMap="RptBaseResultMap" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    SELECT USERID, JYZID, NATURE, UNITNAME, UNITNATURE, IDTYPE, IDNUMBER, OFFICER_EMAIL, OFFICER_MOBILE,
+    OFFICER_TEL, OFFICER_ID, OFFICER_IDTYPE, OFFICER_NAME, UNITADD, ZIPCODE, REGISTERTIME,
+    SERVERREGISTERTIME, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID
+    FROM RPT_ISMS_BASE_USER
+    WHERE USERID=#{userId} AND JYZID=#{jyzId}
+  </select>
+  
+  <resultMap id="RptBaseBandResultMap" type="com.aotain.cu.serviceapi.model.UserBandwidthInformation">
+    <id column="HHID" jdbcType="DECIMAL" property="hhId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="DISTRIBUTETIME" jdbcType="VARCHAR" property="distributeTime" />
+    <result column="BANDWIDTH" jdbcType="DECIMAL" property="bandWidth" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+  </resultMap>
+  <select id="getRptBandWidth" parameterType="java.lang.Long" resultMap="RptBaseBandResultMap">
+    select
+    HHID, USERID, HOUSEID, DISTRIBUTETIME, BANDWIDTH, CREATE_TIME, UPDATE_TIME, CREATE_USERID,
+    UPDATE_USERID
+    from RPT_ISMS_BASE_USER_BANDWIDTH
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+  
+  <insert id="writeUserLog" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+  
+    <selectKey resultType="java.lang.Long" keyProperty="userSeqId" order="BEFORE">
+      SELECT SEQ_WAIT_USERSEQ_ID.nextval userSeqId FROM dual
+    </selectKey>
+    
+    insert into WAIT_ISMS_BASE_USER
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      USERSEQ_ID,
+      SUBMIT_ID,
+      USERID,
+      <if test="jyzId != null">
+        JYZID,
+      </if>
+      <if test="userCode!=null">
+        USERCODE,
+      </if>
+      <if test="nature != null">
+        NATURE,
+      </if>
+      <if test="unitName != null">
+        UNITNAME,
+      </if>
+      <if test="unitNature != null">
+        UNITNATURE,
+      </if>
+      <if test="idType != null">
+        IDTYPE ,
+      </if>
+      <if test="idNumber != null">
+        IDNUMBER ,
+      </if>
+      <if test="officerEmail != null">
+        OFFICER_EMAIL,
+      </if>
+      <if test="officerMobile != null">
+        OFFICER_MOBILE,
+      </if>
+      <if test="officerTelphone != null">
+        OFFICER_TEL,
+      </if>
+      <if test="officerId != null">
+        OFFICER_ID,
+      </if>
+      <if test="officerIdType != null">
+        OFFICER_IDTYPE,
+      </if>
+      <if test="officerName != null">
+        OFFICER_NAME,
+      </if>
+      <if test="unitAddress != null">
+        UNITADD,
+      </if>
+      <if test="unitZipCode != null">
+        ZIPCODE,
+      </if>
+      <if test="registeTime != null">
+        REGISTERTIME,
+      </if>
+      <if test="serviceRegTime != null">
+        SERVERREGISTERTIME,
+      </if>
+      <if test="createTime != null">
+        CREATE_TIME,
+      </if>
+      <if test="updateTime != null">
+        UPDATE_TIME,
+      </if>
+      <if test="createUserId != null">
+        CREATE_USERID,
+      </if>
+      <if test="updateUserId != null">
+        UPDATE_USERID,
+      </if>
+      <if test="unitAddressProvinceCode!=null">
+        UNITADDPROVINCEC,
+      </if>
+      <if test="unitAddressProvinceName!=null">
+        UNITADDPROVINCEN,
+      </if>
+      <if test="unitAddressCityCode!=null">
+        UNITADDCITYC,
+      </if>
+      <if test="unitAddressCityName!=null">
+        UNITADDCITYN,
+      </if>
+      <if test="unitAddressAreaCode!=null">
+        UNITADDAREAC,
+      </if>
+      <if test="unitAddressAreaName!=null">
+        UNITADDAREAN,
+      </if>
+      <if test="areaCode!=null">
+        SUBORDINATEUNIT_AREACODE,
+      </if>
+      <if test="identity!=null">
+        IDENTIFY,
+      </if>
+      <if test="operateType!=null">
+        CZLX,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      #{userSeqId},
+      #{submitId},
+      #{userId},
+      <if test="jyzId != null">
+        #{jyzId},
+      </if>
+      <if test="userCode!=null">
+        #{userCode},
+      </if>
+      <if test="nature != null">
+        #{nature},
+      </if>
+      <if test="unitName != null">
+        #{unitName},
+      </if>
+      <if test="unitNature != null">
+        #{unitNature},
+      </if>
+      <if test="idType != null">
+        #{idType},
+      </if>
+      <if test="idNumber != null">
+        #{idNumber},
+      </if>
+      <if test="officerEmail != null">
+        #{officerEmail},
+      </if>
+      <if test="officerMobile != null">
+        #{officerMobile},
+      </if>
+      <if test="officerTelphone != null">
+        #{officerTelphone},
+      </if>
+      <if test="officerId != null">
+        #{officerId},
+      </if>
+      <if test="officerIdType != null">
+        #{officerIdType},
+      </if>
+      <if test="officerName != null">
+        #{officerName},
+      </if>
+      <if test="unitAddress != null">
+        #{unitAddress},
+      </if>
+      <if test="unitZipCode != null">
+        #{unitZipCode},
+      </if>
+      <if test="registeTime != null">
+        #{registeTime},
+      </if>
+      <if test="serviceRegTime != null">
+        #{serviceRegTime},
+      </if>
+      <if test="createTime != null">
+        #{createTime},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime},
+      </if>
+      <if test="createUserId != null">
+        #{createUserId},
+      </if>
+      <if test="updateUserId != null">
+        #{updateUserId},
+      </if>
+      <if test="unitAddressProvinceCode!=null">
+        #{unitAddressProvinceCode},
+      </if>
+      <if test="unitAddressProvinceName!=null">
+        #{unitAddressProvinceName},
+      </if>
+      <if test="unitAddressCityCode!=null">
+        #{unitAddressCityCode},
+      </if>
+      <if test="unitAddressCityName!=null">
+        #{unitAddressCityName},
+      </if>
+      <if test="unitAddressAreaCode!=null">
+        #{unitAddressAreaCode},
+      </if>
+      <if test="unitAddressAreaName!=null">
+        #{unitAddressAreaName},
+      </if>
+      <if test="areaCode!=null">
+        #{areaCode},
+      </if>
+      <if test="identity!=null">
+        #{identity},
+      </if>
+      <if test="operateType!=null">
+        #{operateType},
+      </if>
+    </trim>
+  </insert>
+  
+  <insert id="writeUserBandLog" parameterType="com.aotain.cu.serviceapi.model.UserBandwidthInformation">
+    insert into WAIT_ISMS_BASE_USER_BANDWIDTH
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      USERSEQ_ID,
+      HHID,
+      <if test="userId != null">
+        USERID,
+      </if>
+      <if test="houseId != null">
+        HOUSEID,
+      </if>
+      <if test="distributeTime != null">
+        DISTRIBUTETIME,
+      </if>
+      <if test="bandWidth != null">
+        BANDWIDTH,
+      </if>
+      <if test="createTime != null">
+        CREATE_TIME,
+      </if>
+      <if test="updateTime != null">
+        UPDATE_TIME,
+      </if>
+      <if test="createUserId != null">
+        CREATE_USERID,
+      </if>
+      <if test="updateUserId != null">
+        UPDATE_USERID,
+      </if>
+      <if test="operateType">
+        CZLX,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      #{userSeqId},
+      #{hhId},
+      <if test="userId != null">
+        #{userId},
+      </if>
+      <if test="houseId != null">
+        #{houseId},
+      </if>
+      <if test="distributeTime != null">
+        #{distributeTime},
+      </if>
+      <if test="bandWidth != null">
+        #{bandWidth},
+      </if>
+      <if test="createTime != null">
+        #{createTime},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime},
+      </if>
+      <if test="createUserId != null">
+        #{createUserId},
+      </if>
+      <if test="updateUserId != null">
+        #{updateUserId},
+      </if>
+      <if test="operateType">
+        #{operateType},
+      </if>
+    </trim>
+  </insert>
+  
+  <insert id="writeUserServiceLog" parameterType="com.aotain.cu.serviceapi.model.UserServiceInformation">
+    insert into WAIT_ISMS_BASE_USER_SERVICE
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      USERSEQ_ID,
+      SERVICEID,
+      <if test="userId != null">
+        USERID,
+      </if>
+      <if test="serviceContent != null">
+        SERVICECONTENT,
+      </if>
+      <if test="registerId != null">
+        REGID,
+      </if>
+      <if test="setmode != null">
+        SETMODE,
+      </if>
+      <if test="serviceType != null">
+        SERVICETYPE,
+      </if>
+      <if test="business != null">
+        BUSINESS ,
+      </if>
+      <if test="regType != null">
+        REGTYPE,
+      </if>
+      <if test="areaCode!=null">
+        SUBORDINATEUNIT_AREACODE,
+      </if>
+      <if test="operateType!=null">
+        CZLX,
+      </if>
+      <if test="createTime != null">
+        CREATE_TIME ,
+      </if>
+      <if test="updateTime != null">
+        UPDATE_TIME,
+      </if>
+      <if test="createUserId != null">
+        CREATE_USERID,
+      </if>
+      <if test="updateUserId != null">
+        UPDATE_USERID,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      #{userSeqId},
+      #{serviceId},
+      <if test="userId != null">
+        #{userId},
+      </if>
+      <if test="serviceContent != null">
+        #{serviceContent},
+      </if>
+      <if test="registerId != null">
+        #{registerId},
+      </if>
+      <if test="setmode != null">
+        #{setmode},
+      </if>
+      <if test="serviceType != null">
+        #{serviceType},
+      </if>
+      <if test="business != null">
+        #{business} ,
+      </if>
+      <if test="regType != null">
+        #{regType},
+      </if>
+      <if test="areaCode!=null">
+        #{areaCode},
+      </if>
+      <if test="operateType!=null">
+        #{operateType},
+      </if>
+      <if test="createTime != null">
+        #{createTime} ,
+      </if>
+      <if test="updateTime != null">
+        #{updateTime},
+      </if>
+      <if test="createUserId != null">
+        #{createUserId},
+      </if>
+      <if test="updateUserId != null">
+        #{updateUserId},
+      </if>
+    </trim>
+  </insert>
+  
+  <insert id="writeUserServiceDomainLog" parameterType="com.aotain.cu.serviceapi.model.ServiceDomainInformation">
+    insert into WAIT_ISMS_BASE_SERVICE_DOMAIN
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      USERSEQ_ID,
+      DOMAINID,
+      <if test="serviceId != null">
+        SERVICEID,
+      </if>
+      <if test="userId!=null">
+        USERID,
+      </if>
+      <if test="domainName != null">
+        DOMAINNAME,
+      </if>
+      <if test="createTime != null">
+        CREATE_TIME,
+      </if>
+      <if test="updateTime != null">
+        UPDATE_TIME,
+      </if>
+      <if test="createUserId != null">
+        CREATE_USERID ,
+      </if>
+      <if test="updateUserId != null">
+        UPDATE_USERID,
+      </if>
+      <if test="operateType!=null">
+        CZLX,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      #{userSeqId},
+      #{domainId},
+      <if test="serviceId != null">
+        #{serviceId},
+      </if>
+      <if test="userId!=null">
+        #{userId},
+      </if>
+      <if test="domainName != null">
+        #{domainName},
+      </if>
+      <if test="createTime != null">
+        #{createTime},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime},
+      </if>
+      <if test="createUserId != null">
+        #{createUserId} ,
+      </if>
+      <if test="updateUserId != null">
+        #{updateUserId},
+      </if>
+      <if test="operateType!=null">
+        #{operateType},
+      </if>
+    </trim>
+  </insert>
+  
+  
+  <insert id="writeUserVirtualLog" parameterType="com.aotain.cu.serviceapi.model.UserVirtualInformation">
+    insert into WAIT_ISMS_BASE_USER_VIRTUAL
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      USERSEQ_ID,
+      VIRTUALID,
+      <if test="userId != null">
+        USERID,
+      </if>
+      <if test="houseId != null">
+        HOUSEID,
+      </if>
+      <if test="name != null">
+        VIRTUALHOST_NAME,
+      </if>
+      <if test="status != null">
+        VIRTUALHOST_STATE,
+      </if>
+      <if test="type != null">
+        VIRTUALHOST_TYPE ,
+      </if>
+      <if test="networkAddress != null">
+        NETWORK_ADDRESS,
+      </if>
+      <if test="mgnAddress != null">
+        MGN_ADDRESS,
+      </if>
+      <if test="createTime != null">
+        CREATE_TIME,
+      </if>
+      <if test="updateTime != null">
+        UPDATE_TIME,
+      </if>
+      <if test="createUserId != null">
+        CREATE_USERID ,
+      </if>
+      <if test="updateUserId != null">
+        UPDATE_USERID ,
+      </if>
+      <if test="operateType!=null">
+        CZLX,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      #{userSeqId},
+      #{virtualId},
+      <if test="userId != null">
+        #{userId},
+      </if>
+      <if test="houseId != null">
+        #{houseId},
+      </if>
+      <if test="name != null">
+        #{name},
+      </if>
+      <if test="status != null">
+        #{status},
+      </if>
+      <if test="type != null">
+        #{type} ,
+      </if>
+      <if test="networkAddress != null">
+        #{networkAddress},
+      </if>
+      <if test="mgnAddress != null">
+        #{mgnAddress},
+      </if>
+      <if test="createTime != null">
+        #{createTime},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime},
+      </if>
+      <if test="createUserId != null">
+        #{createUserId} ,
+      </if>
+      <if test="updateUserId != null">
+        #{updateUserId} ,
+      </if>
+      <if test="operateType!=null">
+        #{operateType},
+      </if>
+    </trim>
+  </insert>
+
+
+</mapper>

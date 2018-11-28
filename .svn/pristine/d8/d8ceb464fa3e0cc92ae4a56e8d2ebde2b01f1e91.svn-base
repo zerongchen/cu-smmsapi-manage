@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="
+			http://www.springframework.org/schema/beans 
+			http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+            http://www.springframework.org/schema/aop 
+            http://www.springframework.org/schema/aop/spring-aop-3.1.xsd
+            http://www.springframework.org/schema/context 
+            http://www.springframework.org/schema/context/spring-context-3.0.xsd
+            http://www.springframework.org/schema/util 
+            http://www.springframework.org/schema/util/spring-util-3.0.xsd 
+            ">
+
+	<!-- 启用自动装配 -->
+	<context:annotation-config />
+
+	<bean id="threadPoolTaskExecutor"
+		class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<property name="corePoolSize" value="30" />
+		<property name="maxPoolSize" value="50" />
+		<property name="keepAliveSeconds" value="1000" />
+	</bean>
+
+	<!-- 初始化上下文工具 获取bean -->
+	<bean class="com.aotain.smmsapi.task.utils.SpringContextTool"/>
+
+	<!-- 定义Spring扫描包的路径 -->
+	<context:component-scan base-package="com.aotain.smmsapi.task.kafka" />
+	<context:component-scan base-package="com.aotain.smmsapi.task.utils" />
+	
+	<import resource="classpath*:spring/spring-base.xml" />
+	<context:component-scan base-package="com.aotain.common.utils.monitorstatistics" />
+
+	<bean id="propertyConfigurer"
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:config-smmstask-kafka.properties</value>
+			</list>
+		</property>
+		<property name="ignoreUnresolvablePlaceholders" value="true" />
+	</bean>
+
+	<!-- <bean id="placeholderConfigurer4"
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="order" value="4" />
+		<property name="locations">
+			<list>
+				<value>file:${work.path}/config/select.properties</value>
+			</list>
+		</property>
+	</bean> -->
+</beans>

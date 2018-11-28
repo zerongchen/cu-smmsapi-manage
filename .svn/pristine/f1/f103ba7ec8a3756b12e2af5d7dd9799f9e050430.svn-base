@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.serviceapi.server.dao.report.RptBaseUserMapper">
+  <resultMap id="BaseResultMap" type="com.aotain.cu.serviceapi.model.UserInformation">
+    <id column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="NATURE" jdbcType="DECIMAL" property="nature" />
+    <result column="UNITNAME" jdbcType="VARCHAR" property="unitName" />
+    <result column="UNITNATURE" jdbcType="DECIMAL" property="unitNature" />
+    <result column="IDTYPE" jdbcType="DECIMAL" property="idType" />
+    <result column="IDNUMBER" jdbcType="VARCHAR" property="idNumber" />
+    <result column="OFFICER_EMAIL" jdbcType="VARCHAR" property="officerEmail" />
+    <result column="OFFICER_MOBILE" jdbcType="VARCHAR" property="officerMobile" />
+    <result column="OFFICER_TEL" jdbcType="VARCHAR" property="officerTelphone" />
+    <result column="OFFICER_ID" jdbcType="VARCHAR" property="officerId" />
+    <result column="OFFICER_IDTYPE" jdbcType="DECIMAL" property="officerIdType" />
+    <result column="OFFICER_NAME" jdbcType="VARCHAR" property="officerName" />
+    <result column="UNITADD" jdbcType="VARCHAR" property="unitAddress" />
+    <result column="ZIPCODE" jdbcType="VARCHAR" property="unitZipCode" />
+    <result column="REGISTERTIME" jdbcType="VARCHAR" property="registeTime" />
+    <result column="SERVERREGISTERTIME" jdbcType="VARCHAR" property="serviceRegTime" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <collection property="serviceList" column="USERID" select="getUserService"></collection>
+    <collection property="bandwidthList" column="USERID" select="getBandWidth"></collection>
+    <collection property="virtualList" column="USERID" select="getVirtualList"></collection>
+  </resultMap>
+
+  <resultMap id="BaseServiceResultMap" type="com.aotain.cu.serviceapi.model.UserServiceInformation">
+    <id column="SERVICEID" jdbcType="DECIMAL" property="serviceId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="SERVICECONTENT" jdbcType="VARCHAR" property="serviceContent" />
+    <result column="REGID" jdbcType="VARCHAR" property="registerId" />
+    <result column="SETMODE" jdbcType="DECIMAL" property="setmode" />
+    <result column="BUSINESS" jdbcType="DECIMAL" property="business" />
+    <result column="REGTYPE" jdbcType="DECIMAL" property="regType" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <collection property="domainList" column="SERVICEID" select="getDomainList"></collection>
+  </resultMap>
+  <select id="getUserService" parameterType="java.lang.Short" resultMap="BaseServiceResultMap">
+    select
+    SERVICEID, USERID, SERVICECONTENT, REGID, SETMODE, BUSINESS, REGTYPE, CREATE_TIME,
+    UPDATE_TIME, CREATE_USERID, UPDATE_USERID
+    from RPT_ISMS_BASE_USER_SERVICE
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+
+  <resultMap id="BaseDmoanResultMap" type="com.aotain.cu.serviceapi.model.ServiceDomainInformation">
+    <id column="DOMAINID" jdbcType="DECIMAL" property="domainId" />
+    <result column="SERVICEID" jdbcType="DECIMAL" property="serviceId" />
+    <result column="DOMAINNAME" jdbcType="VARCHAR" property="domainName" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+  </resultMap>
+  <select id="getDomainList" parameterType="java.lang.Long" resultMap="BaseDmoanResultMap">
+    select
+    DOMAINID, SERVICEID, DOMAINNAME, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID
+    from RPT_ISMS_BASE_SERVICE_DOMAIN
+    where SERVICEID = #{serviceId,jdbcType=DECIMAL}
+  </select>
+
+  <resultMap id="BaseBandResultMap" type="com.aotain.cu.serviceapi.model.UserBandwidthInformation">
+    <id column="HHID" jdbcType="DECIMAL" property="hhId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="DISTRIBUTETIME" jdbcType="VARCHAR" property="distributeTime" />
+    <result column="BANDWIDTH" jdbcType="DECIMAL" property="bandWidth" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+  </resultMap>
+  <select id="getBandWidth" parameterType="java.lang.Long" resultMap="BaseBandResultMap">
+    select
+    HHID, USERID, HOUSEID, DISTRIBUTETIME, BANDWIDTH, CREATE_TIME, UPDATE_TIME, CREATE_USERID,
+    UPDATE_USERID
+    from RPT_ISMS_BASE_USER_BANDWIDTH
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+
+  <resultMap id="BaseVirtualResultMap" type="com.aotain.cu.serviceapi.model.UserVirtualInformation">
+    <id column="VIRTUALID" jdbcType="DECIMAL" property="virtualId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="VIRTUALHOST_NAME" jdbcType="VARCHAR" property="name" />
+    <result column="VIRTUALHOST_STATE" jdbcType="DECIMAL" property="status" />
+    <result column="VIRTUALHOST_TYPE" jdbcType="DECIMAL" property="type" />
+    <result column="NETWORK_ADDRESS" jdbcType="VARCHAR" property="networkAddress" />
+    <result column="MGN_ADDRESS" jdbcType="OTHER" property="mgnAddress" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+  </resultMap>
+
+  <select id="getVirtualList" parameterType="java.lang.Long" resultMap="BaseVirtualResultMap">
+    select
+    VIRTUALID, USERID, HOUSEID, VIRTUALHOST_NAME, VIRTUALHOST_STATE, VIRTUALHOST_TYPE,
+    NETWORK_ADDRESS, MGN_ADDRESS, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID
+    from RPT_ISMS_BASE_USER_VIRTUAL
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+
+
+  <sql id="Base_Column_List">
+    USERID, JYZID, NATURE, UNITNAME, UNITNATURE, IDTYPE, IDNUMBER, OFFICER_EMAIL, OFFICER_MOBILE, 
+    OFFICER_TEL, OFFICER_ID, OFFICER_IDTYPE, OFFICER_NAME, UNITADD, ZIPCODE, REGISTERTIME, 
+    SERVERREGISTERTIME, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID
+  </sql>
+  <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from RPT_ISMS_BASE_USER
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+  
+  <select id="selectByJyzId" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from RPT_ISMS_BASE_USER
+    where JYZID = #{jyzId,jdbcType=DECIMAL}
+  </select>
+  
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+    delete from RPT_ISMS_BASE_USER
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </delete>
+  <insert id="insert" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    insert into RPT_ISMS_BASE_USER (USERID, JYZID, NATURE, 
+      UNITNAME, UNITNATURE, IDTYPE, 
+      IDNUMBER, OFFICER_EMAIL, OFFICER_MOBILE, 
+      OFFICER_TEL, OFFICER_ID, OFFICER_IDTYPE, 
+      OFFICER_NAME, UNITADD, ZIPCODE, 
+      REGISTERTIME, SERVERREGISTERTIME, CREATE_TIME, 
+      UPDATE_TIME, CREATE_USERID, UPDATE_USERID
+      )
+    values (#{userId,jdbcType=DECIMAL}, #{jyzId,jdbcType=DECIMAL}, #{nature,jdbcType=DECIMAL},
+      #{unitName,jdbcType=VARCHAR}, #{unitNature,jdbcType=DECIMAL}, #{idType,jdbcType=DECIMAL},
+      #{idNumber,jdbcType=VARCHAR}, #{officerEmail,jdbcType=VARCHAR}, #{officerMobile,jdbcType=VARCHAR},
+      #{officerTelphone,jdbcType=VARCHAR}, #{officerId,jdbcType=VARCHAR}, #{officerIdType,jdbcType=DECIMAL},
+      #{officerName,jdbcType=VARCHAR}, #{unitAddress,jdbcType=VARCHAR}, #{unitZipCode,jdbcType=VARCHAR},
+      #{registeTime,jdbcType=VARCHAR}, #{serviceRegTime,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP},
+      #{updateTime,jdbcType=TIMESTAMP}, #{createUserId,jdbcType=DECIMAL}, #{updateUserId,jdbcType=DECIMAL}
+      )
+  </insert>
+  <update id="updateByPrimaryKeySelective" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    update RPT_ISMS_BASE_USER
+    <set>
+      <if test="jyzId != null">
+        JYZID = #{jyzId,jdbcType=DECIMAL},
+      </if>
+      <if test="nature != null">
+        NATURE = #{nature,jdbcType=DECIMAL},
+      </if>
+      <if test="unitName != null">
+        UNITNAME = #{unitName,jdbcType=VARCHAR},
+      </if>
+      <if test="unitNature != null">
+        UNITNATURE = #{unitNature,jdbcType=DECIMAL},
+      </if>
+      <if test="idType != null">
+        IDTYPE = #{idType,jdbcType=DECIMAL},
+      </if>
+      <if test="idNumber != null">
+        IDNUMBER = #{idNumber,jdbcType=VARCHAR},
+      </if>
+      <if test="officerEmail != null">
+        OFFICER_EMAIL = #{officerEmail,jdbcType=VARCHAR},
+      </if>
+      <if test="officerMobile != null">
+        OFFICER_MOBILE = #{officerMobile,jdbcType=VARCHAR},
+      </if>
+      <if test="officerTelphone != null">
+        OFFICER_TEL = #{officerTelphone,jdbcType=VARCHAR},
+      </if>
+      <if test="officerId != null">
+        OFFICER_ID = #{officerId,jdbcType=VARCHAR},
+      </if>
+      <if test="officerIdType != null">
+        OFFICER_IDTYPE = #{officerIdType,jdbcType=DECIMAL},
+      </if>
+      <if test="officerName != null">
+        OFFICER_NAME = #{officerName,jdbcType=VARCHAR},
+      </if>
+      <if test="unitAddress != null">
+        UNITADD = #{unitAddress,jdbcType=VARCHAR},
+      </if>
+      <if test="unitZipCode != null">
+        ZIPCODE = #{unitZipCode,jdbcType=VARCHAR},
+      </if>
+      <if test="registeTime != null">
+        REGISTERTIME = #{registeTime,jdbcType=VARCHAR},
+      </if>
+      <if test="serviceRegTime != null">
+        SERVERREGISTERTIME = #{serviceRegTime,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="createUserId != null">
+        CREATE_USERID = #{createUserId,jdbcType=DECIMAL},
+      </if>
+      <if test="updateUserId != null">
+        UPDATE_USERID = #{updateUserId,jdbcType=DECIMAL},
+      </if>
+    </set>
+    where USERID = #{userid,jdbcType=DECIMAL}
+  </update>
+  <select id="selectCountById" parameterType="com.aotain.cu.serviceapi.model.UserInformation" resultType="java.lang.Integer">
+    select count(1)  from RPT_ISMS_BASE_USER
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+
+  <update id="updateOrAdd" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    MERGE INTO RPT_ISMS_BASE_USER t1 USING ( SELECT #{userId,jdbcType=DECIMAL} as USERID FROM dual ) t2 ON( t1.USERID = t2.USERID )
+    WHEN MATCHED THEN
+    UPDATE
+    <set>
+      <if test="jyzId != null">
+        JYZID = #{jyzId,jdbcType=DECIMAL},
+      </if>
+      <if test="nature != null">
+        NATURE = #{nature,jdbcType=DECIMAL},
+      </if>
+      <if test="unitName != null">
+        UNITNAME = #{unitName,jdbcType=VARCHAR},
+      </if>
+      <if test="unitNature != null">
+        UNITNATURE = #{unitNature,jdbcType=DECIMAL},
+      </if>
+      <if test="idType != null">
+        IDTYPE = #{idType,jdbcType=DECIMAL},
+      </if>
+      <if test="idNumber != null">
+        IDNUMBER = #{idNumber,jdbcType=VARCHAR},
+      </if>
+      <if test="officerEmail != null">
+        OFFICER_EMAIL = #{officerEmail,jdbcType=VARCHAR},
+      </if>
+      <if test="officerMobile != null">
+        OFFICER_MOBILE = #{officerMobile,jdbcType=VARCHAR},
+      </if>
+      <if test="officerTelphone != null">
+        OFFICER_TEL = #{officerTelphone,jdbcType=VARCHAR},
+      </if>
+      <if test="officerId != null">
+        OFFICER_ID = #{officerId,jdbcType=VARCHAR},
+      </if>
+      <if test="officerIdType != null">
+        OFFICER_IDTYPE = #{officerIdType,jdbcType=DECIMAL},
+      </if>
+      <if test="officerName != null">
+        OFFICER_NAME = #{officerName,jdbcType=VARCHAR},
+      </if>
+      <if test="unitAddress != null">
+        UNITADD = #{unitAddress,jdbcType=VARCHAR},
+      </if>
+      <if test="unitZipCode != null">
+        ZIPCODE = #{unitZipCode,jdbcType=VARCHAR},
+      </if>
+      <if test="registeTime != null">
+        REGISTERTIME = #{registeTime,jdbcType=VARCHAR},
+      </if>
+      <if test="serviceRegTime != null">
+        SERVERREGISTERTIME = #{serviceRegTime,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        UPDATE_TIME = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="createUserId != null">
+        CREATE_USERID = #{createUserId,jdbcType=DECIMAL},
+      </if>
+      <if test="updateUserId != null">
+        UPDATE_USERID = #{updateUserId,jdbcType=DECIMAL},
+      </if>
+    </set>
+    WHEN NOT MATCHED THEN
+    INSERT (USERID, JYZID, NATURE,
+    UNITNAME, UNITNATURE, IDTYPE,
+    IDNUMBER, OFFICER_EMAIL, OFFICER_MOBILE,
+    OFFICER_TEL, OFFICER_ID, OFFICER_IDTYPE,
+    OFFICER_NAME, UNITADD, ZIPCODE,
+    REGISTERTIME, SERVERREGISTERTIME, CREATE_TIME,
+    UPDATE_TIME, CREATE_USERID, UPDATE_USERID
+    ) values (#{userId,jdbcType=DECIMAL}, #{jyzId,jdbcType=DECIMAL}, #{nature,jdbcType=DECIMAL},
+    #{unitName,jdbcType=VARCHAR}, #{unitNature,jdbcType=DECIMAL}, #{idType,jdbcType=DECIMAL},
+    #{idNumber,jdbcType=VARCHAR}, #{officerEmail,jdbcType=VARCHAR}, #{officerMobile,jdbcType=VARCHAR},
+    #{officerTelphone,jdbcType=VARCHAR}, #{officerId,jdbcType=VARCHAR}, #{officerIdType,jdbcType=DECIMAL},
+    #{officerName,jdbcType=VARCHAR}, #{unitAddress,jdbcType=VARCHAR}, #{unitZipCode,jdbcType=VARCHAR},
+    #{registeTime,jdbcType=VARCHAR}, #{serviceRegTime,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP},
+    #{updateTime,jdbcType=TIMESTAMP}, #{createUserId,jdbcType=DECIMAL}, #{updateUserId,jdbcType=DECIMAL}
+    )
+  </update>
+  
+  <select id="findByUserId"  resultType="com.aotain.cu.serviceapi.model.UserInformation">
+        select * from IDC_ISMS_BASE_USER
+        WHERE USERID = #{userId}
+  </select>
+  
+  <select id="findAssociatedUserWithHouseId"  resultType="com.aotain.cu.serviceapi.model.UserInformation" parameterType="long">
+        select * from IDC_ISMS_BASE_USER
+        WHERE USERID = #{userId}
+  </select>
+
+</mapper>

@@ -1,0 +1,165 @@
+package com.aotain.smmsapi.task;
+
+import java.io.IOException;
+import java.util.Properties;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.log4j.Logger;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+import com.aotain.common.config.ContextUtil;
+import com.aotain.common.config.LocalConfig;
+import com.aotain.common.utils.monitorstatistics.ModuleConstant;
+import com.aotain.common.utils.monitorstatistics.TypeConstant;
+import com.aotain.common.utils.tools.EnvironmentUtils;
+import com.aotain.common.utils.tools.MonitorStatisticsUtils;
+import com.aotain.common.utils.tools.Tools;
+import com.aotain.common.utils.zookeeper.LeaderLatchClient;
+import com.aotain.cu.serviceapi.utils.BaseFeignBuilder;
+import com.aotain.cu.serviceapi.utils.ServiceAddressSelector;
+import com.aotain.smmsapi.task.serviceapi.IDemoService;
+import com.aotain.smmsapi.task.smmsreturn.service.DoSmmsReturnFileThread;
+import com.aotain.smmsapi.task.bean.SynchConfig;
+import com.aotain.smmsapi.task.serviceapi.DemoServiceHystrix;
+import com.aotain.smmsapi.task.utils.TaskConfigUtils;
+import com.aotain.smmsapi.task.utils.TaskConfigUtilsFactory;
+
+/**
+ * 定时器任务启动入口
+ * 
+ * @author liuz@aotian.com
+ * @date 2017年11月15日 下午4:08:18
+ */
+public class QuartzMain {
+	static {
+		EnvironmentUtils.ConfigBuilder cb = new EnvironmentUtils.ConfigBuilder();
+		cb.append(EnvironmentUtils.WORK_PATH, ".");
+		cb.append(EnvironmentUtils.LOG4J_PATH, "config/log4j-quartz.properties");
+		cb.append(EnvironmentUtils.EVN_DIR, "cu-smmsapi-task-quartz");
+		EnvironmentUtils.init(cb.build());
+		Properties prop = EnvironmentUtils.loadPropertiesFromEnv("ribbon.properties");
+		ServiceAddressSelector.init(prop);
+		SYNCH_CONFIG = SynchConfig.loadFromeProperties(prop);
+	}
+	private static String ZOOKEEPER_CONNECT_STR_NAME = "zookeeper.connect";
+	private static String ZOOKEEPER_SELECT_NAMESPACE = "CU";
+	public static LeaderLatchClient LSELECTOR;
+	public static String SERVICE_NODE_NAME;
+	public static SynchConfig SYNCH_CONFIG; 
+	private static Logger logger = Logger.getLogger(QuartzMain.class);
+
+	/**
+	 * 初始化LeaderSelect
+	 * 
+	 * @param cfg
+	 * @return
+	 */
+	private static LeaderLatchClient initLeaderSelect(TaskConfigUtils cfg) {
+		RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+		CuratorFramework client = CuratorFrameworkFactory.builder()
+				.connectString(LocalConfig.getInstance().getHashValueByHashKey(ZOOKEEPER_CONNECT_STR_NAME))
+				.retryPolicy(retryPolicy).sessionTimeoutMs(cfg.getSelectSessionTimeout().intValue())
+				.connectionTimeoutMs(cfg.getSelectConnectTimeout().intValue()).namespace(ZOOKEEPER_SELECT_NAMESPACE)
+				.build();
+		client.start();
+		SERVICE_NODE_NAME = Tools.getHostName() + "-" + cfg.getSelectName();
+
+		final LeaderLatchClient curatorClient = new LeaderLatchClient(client, cfg.getSelectPath(),
+				SERVICE_NODE_NAME);
+
+		try {
+			curatorClient.start();
+			LSELECTOR = curatorClient;
+			return curatorClient;
+		} catch (Exception e) {
+			logger.error("zookeeper leader select init exception, service will be exit", e);
+			MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ, e);
+			return null;
+		}
+	}
+
+	public static void main(String[] args) {
+		// 加载quartz框架，启动所有Quartz任务
+		try {
+			ApplicationContext context = new ClassPathXmlApplicationContext(
+					new String[] { "classpath*:spring-smmstask-quartz.xml" });
+			MonitorStatisticsUtils.initModuleALL(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ);
+//			TaskConfigUtils cfg = ContextUtil.getContext().getBean(TaskConfigUtils.class);
+			TaskConfigUtils cfg = TaskConfigUtilsFactory.createConfig("select-quartz.properties");
+			final LeaderLatchClient lselector = initLeaderSelect(cfg);
+
+			if (lselector == null) {
+				logger.error("service shutdown with error");
+				System.exit(-1); // 强制退出
+			}
+
+			final DoSmmsReturnFileThread thread = new DoSmmsReturnFileThread();
+			thread.run();
+			// 注册退出事件响应
+			Runtime.getRuntime().addShutdownHook(new Thread() {
+				@Override
+				public void run() {
+					if (lselector != null) {
+						try {
+							lselector.close();
+						} catch (IOException e) {
+							logger.warn("leader selector close exception", e);
+							MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ, e);
+						}
+					}
+					thread.stop();
+					logger.info("MMS Quartz task service shutdown");
+				}
+			});
+
+			
+			
+			logger.info("SMMS Quartz task service start ...");
+			threadMonitor();
+		} catch (Exception e) {
+			logger.error("SMMS Quartz task service exception ...", e);
+			MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ,e);
+		}
+	}
+
+	private static int DALAY = 60 * 1000;
+	private static int INTERVAL = 60 * 1000;
+
+	/**
+	 * 写线程异常监控
+	 */
+	private static void threadMonitor() {
+		Timer timer = new Timer();
+		timer.schedule(new TimerTask() {
+			@Override
+			public void run() {
+				// 休眠中，不做线程监控
+				if(LSELECTOR == null || !LSELECTOR.getLeader()){
+					MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ,
+							TypeConstant.EXCEPTION_TYPE_THREAD, 0);
+					return;
+				}
+				
+				int count = MonitorStatisticsUtils.getQuartErrorThreadCount();
+				if (count == -1) {
+					logger.error("thread monitor exception - quartz task monitor error(count is -1).");
+				} else {
+					if(count > 0){
+						logger.error("thread monitor exception , error count is "+count);
+					}else{
+						logger.debug("thread monitor exception , error count is "+count);
+					}
+					MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ,
+							TypeConstant.EXCEPTION_TYPE_THREAD, count);
+				}
+
+			}
+		}, DALAY, INTERVAL);
+	}
+}

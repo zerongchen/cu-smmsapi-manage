@@ -1,0 +1,858 @@
+package com.aotain.smmsapi.task.smmsreturn.service.impl;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.aotain.common.config.ContextUtil;
+import com.aotain.common.config.redis.BaseRedisService;
+import com.aotain.cu.serviceapi.dto.ResultDto;
+import com.aotain.cu.serviceapi.model.HouseFrameInformation;
+import com.aotain.cu.serviceapi.model.HouseGatewayInformation;
+import com.aotain.cu.serviceapi.model.HouseIPSegmentInformation;
+import com.aotain.cu.serviceapi.model.HouseInformation;
+import com.aotain.cu.serviceapi.model.IdcInformation;
+import com.aotain.cu.serviceapi.model.UserBandwidthInformation;
+import com.aotain.cu.serviceapi.model.UserInformation;
+import com.aotain.cu.serviceapi.model.UserServiceInformation;
+import com.aotain.cu.serviceapi.model.UserVirtualInformation;
+import com.aotain.cu.serviceapi.utils.BaseFeignBuilder;
+import com.aotain.cu.serviceapi.utils.BaseFeignBuilder.EncodeDecodeType;
+import com.aotain.smmsapi.task.bean.IsmsWaitSubmitReportFile;
+import com.aotain.smmsapi.task.bean.OperatorCache;
+import com.aotain.smmsapi.task.bean.SmmsResultCache;
+import com.aotain.smmsapi.task.serviceapi.preinput.IPreinputService;
+import com.aotain.smmsapi.task.serviceapi.preinput.PreinputServiceFallback;
+import com.aotain.smmsapi.task.serviceapi.report.IReportHouseService;
+import com.aotain.smmsapi.task.serviceapi.report.IReportIdcService;
+import com.aotain.smmsapi.task.serviceapi.report.IReportUserService;
+import com.aotain.smmsapi.task.serviceapi.report.ReportHouseServiceFallback;
+import com.aotain.smmsapi.task.serviceapi.report.ReportIdcServiceFallback;
+import com.aotain.smmsapi.task.serviceapi.report.ReportUserServiceFallback;
+import com.aotain.smmsapi.task.smmsreturn.mapper.OperatorCacheDao;
+import com.aotain.smmsapi.task.smmsreturn.mapper.OperatorStatusDao;
+import com.aotain.smmsapi.task.smmsreturn.mapper.OperatorTablesDao;
+import com.aotain.smmsapi.task.smmsreturn.mapper.SubmitReportFileDao;
+import com.aotain.smmsapi.task.smmsreturn.mapper.WaitBaseInforDao;
+import com.aotain.smmsapi.task.smmsreturn.service.SmmsReturnService;
+
+/**
+ * 管局999目录返回之后，需要将待上报表更新到上报表并清理操作表、等待表数据状态
+ * 
+ * @author liuz@aotian.com
+ * @date 2018年8月15日 下午5:38:58
+ */
+@Service
+public class SmmsReturnServiceImpl implements SmmsReturnService {
+	private Logger logger = Logger.getLogger(SmmsReturnServiceImpl.class);
+	private static final String RIBBON_CLIENT_NAME = "myclient";
+
+	@Autowired
+	private SubmitReportFileDao submitReportFileDao;
+
+	@Autowired
+	private OperatorCacheDao operatorCacheDao;
+
+	@Autowired
+	private OperatorStatusDao operatorStatusDao;
+
+	@Autowired
+	private OperatorTablesDao operatorTablesDao;
+
+	@SuppressWarnings("unchecked")
+	private BaseRedisService<String, String, String> rediscluster;
+
+	@Autowired
+	private WaitBaseInforDao waitBaseInforDao;
+
+	// redis中一个文件处理结果的缓存机制如下：
+	// 1. 最多处理10次
+	// 2. 满了10次重试,清除缓存
+	// 3. 处理的1-6次，至少5分钟以后执行重试；7-9次，1小时后执行下次重试
+	private static final String SMMS_999_FILE_RESULT_KEY = "smms_999_file_result";
+
+	private static final long WAIT_TIME_LEVEL_1 = 5 * 60; // 第一个级别的重试等待时间
+	private static final long WAIT_TIME_LEVEL_2 = 60 * 60; // 第二个级别的重试等待时间
+
+	@Override
+	public void writeRedisCache(long taskId, String fileName, int status, int fileType) {
+		// 只有基础数据上报需要执行后续流程
+		// 1-基础数据记录类型；2-基础数据监测异常记录数据类型；3-访问日志查询记录数据类型；
+		// 4-违法信息监测记录数据类型；5-违法信息过滤记录数据类型；6-基础数据查询指令数据类型；
+		// 7-ISMS活动状态数据类型；8-活跃资源监测记录数据类型；9-违法违规网站监测记录类型
+		if (fileType != 1) {
+			logger.debug("is not basic data xml - taskId=" + taskId + ",fileName=" + fileName + ",status=" + status
+					+ ",type=" + fileType);
+			return;
+		}
+		if (rediscluster == null) {
+			rediscluster = ContextUtil.getContext().getBean("baseRedisServiceImpl", BaseRedisService.class);
+		}
+		SmmsResultCache cache = new SmmsResultCache();
+		cache.setTaskId(taskId);
+		cache.setFileName(fileName);
+		cache.setFileType(fileType);
+		cache.setStatus(status);
+		try {
+			rediscluster.putHash(SMMS_999_FILE_RESULT_KEY, fileName, JSON.toJSONString(cache));
+		} catch (Exception e) {
+			logger.error("write 999 return result to redis cache fail  - taskId=" + taskId + ",fileName=" + fileName
+					+ ",status=" + status + ",type=" + fileType, e);
+			doProcess(taskId, fileName, status, fileType); // 失败时，直接调用处理流程，否则异步调用
+		}
+	}
+
+	@Override
+	public void redisCacheDoProcess() {
+		if (rediscluster == null) {
+			rediscluster = ContextUtil.getContext().getBean("baseRedisServiceImpl", BaseRedisService.class);
+		}
+		Map<String, String> datas = rediscluster.getHashs(SMMS_999_FILE_RESULT_KEY);
+		if (datas == null || datas.isEmpty()) {
+			logger.debug("no file cache info found");
+			return;
+		}
+		for (String key : datas.keySet()) {
+			String value = datas.get(key);
+			logger.info("start deal return file : fileName=" + key);
+			if (StringUtils.isNotBlank(value)) {
+				SmmsResultCache cache = JSON.parseObject(value, SmmsResultCache.class);
+				int dealTimes = cache.getDealTimes();
+				if (dealTimes == 0) {
+					doProcess(cache.getTaskId(), cache.getFileName(), cache.getStatus(), cache.getFileType());
+					continue;
+				}
+				if (dealTimes < 6
+						&& (System.currentTimeMillis() / 1000 - cache.getLastDealTime() > WAIT_TIME_LEVEL_1)) {
+					doProcess(cache.getTaskId(), cache.getFileName(), cache.getStatus(), cache.getFileType());
+					continue;
+				}
+				if (dealTimes < 10
+						&& (System.currentTimeMillis() / 1000 - cache.getLastDealTime() > WAIT_TIME_LEVEL_2)) {
+					doProcess(cache.getTaskId(), cache.getFileName(), cache.getStatus(), cache.getFileType());
+					continue;
+				}
+				if (dealTimes >= 10) {
+					logger.error("retry time out of 10 , remove cache : " + cache.toString());
+					rediscluster.removeHash(SMMS_999_FILE_RESULT_KEY, cache.getFileName());
+					continue;
+				}
+			} else {
+				logger.warn("miss value on redis of  return file : fileName=" + key);
+			}
+		}
+	}
+
+	@Override
+	public void doProcess(long taskId, String fileName, int status, int fileType) {
+		try {
+			// 1. 此文件在WAIT_ISMS_SUBMIT_REPORTFILE表中是否存在
+			// 不存在时，不执行后续处理
+			// 存在时，获取提交记录ID，经营者ID、机房ID,用户ID
+			IsmsWaitSubmitReportFile rfile = getReportFileInfo(fileName + ".xml");
+			if (rfile == null) {
+				logger.warn("no sumit record  - taskId=" + taskId + ",fileName=" + fileName + ",status=" + status);
+				String content = rediscluster.getHash(SMMS_999_FILE_RESULT_KEY, fileName);
+				if (StringUtils.isNotBlank(content)) {
+					SmmsResultCache cache = JSON.parseObject(content, SmmsResultCache.class);
+					cache.setDealTimes(cache.getDealTimes() + 1);
+					cache.setLastDealTime(System.currentTimeMillis() / 1000);
+					// 抛出未知异常，即当成文件处理流程失败，更新redis缓存
+					rediscluster.putHash(SMMS_999_FILE_RESULT_KEY, fileName, JSON.toJSONString(cache));
+				}
+				return;
+			}
+			if (rediscluster == null) {
+				rediscluster = ContextUtil.getContext().getBean("baseRedisServiceImpl", BaseRedisService.class);
+			}
+			logger.info(
+					" start deal smms return info - taskId=" + taskId + ",fileName=" + fileName + ",status=" + status);
+			// 2. 管局返回文件处理成功，调用成功处理流程
+			if (status == 0) {
+				doSuccessProcess(taskId, fileName, rfile);
+			}
+			// 3. 管局返回文件处理失败，调用失败处理流程
+			else {
+				doFailProcess(taskId, fileName, status, rfile);
+			}
+			// 4. 检查整个提交批次的文件是否都已处理完成
+			checkSubmitFiles(rfile.getSubmitId());
+			logger.info(" complete deal smms return info - taskId=" + taskId + ",fileName=" + fileName + ",status="
+					+ status);
+
+			// 正常情况下处理完成后，删除redis缓存
+			String content = rediscluster.getHash(SMMS_999_FILE_RESULT_KEY, fileName);
+			if (StringUtils.isNotBlank(content)) {
+				rediscluster.removeHash(SMMS_999_FILE_RESULT_KEY, fileName);
+			}
+		} catch (Throwable e) {
+			logger.error("deal smms return info exception - taskId=" + taskId + ",fileName=" + fileName + ",status="
+					+ status, e);
+			String content = rediscluster.getHash(SMMS_999_FILE_RESULT_KEY, fileName);
+			if (StringUtils.isNotBlank(content)) {
+				SmmsResultCache cache = JSON.parseObject(content, SmmsResultCache.class);
+				cache.setDealTimes(cache.getDealTimes() + 1);
+				cache.setLastDealTime(System.currentTimeMillis() / 1000);
+				// 抛出未知异常，即当成文件处理流程失败，更新redis缓存
+				rediscluster.putHash(SMMS_999_FILE_RESULT_KEY, fileName, JSON.toJSONString(cache));
+			}
+		}
+	}
+
+	/**
+	 * 统计检查submitId对应的所有文件，在所有文件都处理完成的情况下，更新
+	 * 
+	 * @param submitId
+	 */
+	private void checkSubmitFiles(Long submitId) {
+		// 1. 查询文件总数
+		int noDealFileCount = submitReportFileDao.countSubmitFile(submitId, -1);
+		int initCount = submitReportFileDao.countSubmitFile(submitId, 0); // 处于初始状态的文件数量
+		// 存在文件，且文件都已经处理完成（999已返回且后续流程执行完成）
+		if (noDealFileCount > 0 && initCount == 0) {
+			// 2. 查询失败文件总数
+			int failCount = submitReportFileDao.countSubmitFile(submitId, 1);
+			if (failCount > 0) {
+				int cnt = submitReportFileDao.updateSubmitLogStatus(submitId, 2); // 处理上报失败
+				if (cnt == 0) {
+					logger.warn("update submit log dealFlag fail : submitId=" + submitId + ",dealFlag=" + 2);
+				}
+			} else {
+				int cnt = submitReportFileDao.updateSubmitLogStatus(submitId, 3); // 处理上报成功
+				if (cnt == 0) {
+					logger.warn("update submit log dealFlag fail : submitId=" + submitId + ",dealFlag=" + 3);
+				}
+			}
+		}
+	}
+
+	/**
+	 * 管局返回失败的处理流程
+	 * 
+	 * @param taskId
+	 * @param fileName
+	 * @param status
+	 * @param rfile
+	 */
+	private void doFailProcess(long taskId, String fileName, int status, IsmsWaitSubmitReportFile rfile) {
+		// 1. 调用缓存处理提交预审函数
+		refreshCache(rfile);
+		// 2. 更新文件上报状态为失败
+		int cnt = submitReportFileDao.updateDealFlag(rfile.getReportFileName(), 1); // 文件上报失败
+		if (cnt == 0) {
+			logger.warn("update submitRpoertFile dealFlag fail - no submit file record found : fileName="
+					+ rfile.getReportFileName());
+		}
+		// 3. 将操作表的记录改成上报失败
+		// 3.1 idc_isms_base_idc.deal_flag改成失败
+		if (isJyzReport(rfile)) {
+			cnt = operatorStatusDao.updateJyzDealFlag(rfile.getJyzId(), 6);	// 上报失败
+			if (cnt == 0) {
+				logger.warn("update jyz.dealFlag fail - no jyz record found : fileName=" + rfile.getReportFileName()
+						+ ",jyzId=" + rfile.getJyzId());
+			}
+		}
+		// 3.2 idc_isms_base_house.DEAL_FLAG改成上报失败
+		if (StringUtils.isNotBlank(rfile.getHouseId())) {
+			cnt = operatorStatusDao.updateHouseDealFlag(rfile.getHouseId(), 6);
+			if (cnt == 0) {
+				logger.warn("update house.dealFlag fail - no house record found : fileName=" + rfile.getReportFileName()
+						+ ",houseId=" + rfile.getHouseId());
+			}
+		}
+		// 3.3 idc_isms_base_user.DEAL_FLAG改成上报失败
+		if (StringUtils.isNotBlank(rfile.getUserId())) {
+			cnt = operatorStatusDao.updateUserDealFlag(rfile.getUserId(), 6);
+			if (cnt == 0) {
+				logger.warn("update user.dealFlag fail - no user record found : fileName=" + rfile.getReportFileName()
+						+ ",userId=" + rfile.getUserId());
+			}
+		}
+	}
+
+	/**
+	 * 判断是否为经营者上报（若只有jyzId不为空，或者jzyId,userId,houseId三者都不为空时，判定为经营者上报）
+	 * 
+	 * @param rfile
+	 * @return
+	 */
+	private boolean isJyzReport(IsmsWaitSubmitReportFile rfile) {
+		if (!StringUtils.isBlank(rfile.getJyzId())) {
+			if (StringUtils.isBlank(rfile.getHouseId()) && StringUtils.isBlank(rfile.getUserId())) {
+				return true;
+			}
+			if (StringUtils.isNotBlank(rfile.getUserId()) && StringUtils.isNotBlank(rfile.getUserId())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 管局返回成功的处理流程
+	 * 
+	 * @param taskId
+	 * @param fileName
+	 * @param rfile
+	 */
+	private void doSuccessProcess(long taskId, String fileName, IsmsWaitSubmitReportFile rfile) {
+		logger.info("start doSuccessProcess : taskId=" + taskId + ",fileName=" + fileName);
+		// 1. 新增、更新流程，调用缓存处理提交预审函数
+		if (rfile.getReportType() == 1 || rfile.getReportType() == 2) { // 1新增；2变更；3删除
+			logger.info("doSuccessProcess - refreshCache ： taskId=" + taskId + ",fileName=" + fileName);
+			refreshCache(rfile);
+		} else { // 删除流程，直接删除所有缓存记录
+			logger.info("doSuccessProcess - deleteCache ： taskId=" + taskId + ",fileName=" + fileName);
+			deleteCache(rfile);
+		}
+		logger.info("doSuccessProcess - doUpadateProcess ： taskId=" + taskId + ",fileName=" + fileName);
+		// 2. 执行更新流程
+		doUpadateProcess(rfile);
+		logger.info("doSuccessProcess - updateDealFlag ： taskId=" + taskId + ",fileName=" + fileName);
+		// 3. 将操作表的记录改成上报成功
+		int cnt = submitReportFileDao.updateDealFlag(rfile.getReportFileName(), 2); // 文件上报失败
+		if (cnt == 0) {
+			logger.warn("update submitRpoertFile dealFlag fail - no submit file record found : fileName="
+					+ rfile.getReportFileName());
+		}
+
+		// 3.1 idc_isms_base_idc.deal_flag改成成功
+		if (isJyzReport(rfile)) {
+			cnt = operatorStatusDao.updateJyzDealFlag(rfile.getJyzId(), 5);	// 上报成功
+			if (cnt == 0) {
+				logger.warn("update jyz.dealFlag fail - no jyz record found : fileName=" + rfile.getReportFileName()
+						+ ",jyzId=" + rfile.getJyzId());
+			}
+		}
+		// 3.2 idc_isms_base_house.DEAL_FLAG改成上报成功
+		if (StringUtils.isNotBlank(rfile.getHouseId())) {
+			cnt = operatorStatusDao.updateHouseDealFlag(rfile.getHouseId(), 5);
+			if (cnt == 0) {
+				logger.warn("update house.dealFlag fail - no house record found : fileName=" + rfile.getReportFileName()
+						+ ",houseId=" + rfile.getHouseId());
+			}
+		}
+		// 3.3 idc_isms_base_user.DEAL_FLAG改成上报成功
+		if (StringUtils.isNotBlank(rfile.getUserId())) {
+			cnt = operatorStatusDao.updateUserDealFlag(rfile.getUserId(), 5);
+			if (cnt == 0) {
+				logger.warn("update user.dealFlag fail - no user record found : fileName=" + rfile.getReportFileName()
+						+ ",userId=" + rfile.getUserId());
+			}
+		}
+		logger.info("finish doSuccessProcess : taskId=" + taskId + ",fileName=" + fileName);
+	}
+
+	/**
+	 * 处理更新流程
+	 * 
+	 * @param rfile
+	 */
+	private void doUpadateProcess(IsmsWaitSubmitReportFile rfile) {
+		IReportIdcService idcApi = BaseFeignBuilder.getCacheFeign(IReportIdcService.class, RIBBON_CLIENT_NAME,
+				new ReportIdcServiceFallback(), BaseFeignBuilder.EncodeDecodeType.EDT_JSON_JSON);
+		IReportHouseService houseApi = BaseFeignBuilder.getCacheFeign(IReportHouseService.class, RIBBON_CLIENT_NAME,
+				new ReportHouseServiceFallback(), BaseFeignBuilder.EncodeDecodeType.EDT_JSON_JSON);
+		IReportUserService userApi = BaseFeignBuilder.getCacheFeign(IReportUserService.class, RIBBON_CLIENT_NAME,
+				new ReportUserServiceFallback(), BaseFeignBuilder.EncodeDecodeType.EDT_JSON_JSON);
+
+		int reportType = rfile.getReportType();
+		// 新增流程
+		if (reportType == 1) {
+			if (!StringUtils.isBlank(rfile.getJyzId())) {
+				// 经营者新增
+				List<IdcInformation> idcList = waitBaseInforDao.getIdcInformation(rfile.getSubmitId(),
+						rfile.getJyzId());
+				logger.info("start insert idc information ... ：idcSize=" + idcList == null ? 0 : idcList.size());
+				if (idcList != null && idcList.size() > 0) {
+					for (IdcInformation idc : idcList) {
+						logger.info("start insert idc information ... ：" + JSON.toJSONString(idc));
+						ResultDto result = idcApi.insert(idc);
+						if (result != null) {
+							if (result.getResultCode() != 0) {
+								logger.error("call api fail - api return error : resultCode" + result.getResultCode()
+										+ ",statusCode=" + result.getStatusCode() + ",resultMsg="
+										+ result.getResultMsg());
+							}
+						}
+						logger.info("finished insert idc information, result is " + JSON.toJSONString(idc));
+					}
+				}
+			}
+			if (!StringUtils.isBlank(rfile.getHouseId())) {
+				List<HouseInformation> houseList = waitBaseInforDao.getHouseInformation(rfile.getSubmitId(),
+						rfile.getHouseId());
+				logger.info("start insert house information ... ：houseSize" + houseList == null ? 0 : houseList.size());
+				if (houseList != null && houseList.size() > 0) {
+					logger.info("start insert house information ... ：" + JSON.toJSONString(houseList));
+					List<ResultDto> resultList = houseApi.insert(houseList);
+					if (resultList != null && resultList.size() > 0) {
+						int index = 0;
+						for (ResultDto result : resultList) {
+							HouseInformation hinfor = houseList.get(index);
+							if (result != null) {
+								if (result.getResultCode() != 0) {
+									logger.error("call api fail - api return error : resultCode="
+											+ result.getResultCode() + ",statusCode=" + result.getStatusCode()
+											+ ",resultMsg=" + result.getResultMsg());
+								}
+							}
+							// 更新子节点信息
+							doUpdateHouseChildrenStatus(hinfor, result);
+							index++;
+						}
+					}
+					logger.info("finished insert house information, result is " + JSON.toJSONString(houseList));
+				}
+			}
+			if (!StringUtils.isBlank(rfile.getUserId())) {
+				// 用户新增
+				List<UserInformation> userList = waitBaseInforDao.getUserInformation(rfile.getSubmitId(),
+						rfile.getUserId());
+				logger.info("start insert user information ... ：userSize" + userList == null ? 0 : userList.size());
+				if (userList != null && userList.size() > 0) {
+					logger.info("start insert user information ... ：" + JSON.toJSONString(userList));
+					List<ResultDto> resultList = userApi.insert(userList);
+					if (resultList != null && resultList.size() > 0) {
+						int index = 0;
+						for (ResultDto result : resultList) {
+							UserInformation userInfor = userList.get(index);
+							if (result != null) {
+								if (result.getResultCode() != 0) {
+									logger.error("call api fail - api return error : resultCode="
+											+ result.getResultCode() + ",statusCode=" + result.getStatusCode()
+											+ ",resultMsg=" + result.getResultMsg());
+								}
+							}
+							doUpdateUserChildrenStatus(userInfor, result);
+							index++;
+						}
+					}
+					logger.info("finished insert house information : " + JSON.toJSONString(userList));
+				}
+			}
+		}
+		// 变更流程
+		else if (reportType == 2) {
+			if (!StringUtils.isBlank(rfile.getJyzId())) {
+				// 经营者修改
+				List<IdcInformation> idcList = waitBaseInforDao.getIdcInformation(rfile.getSubmitId(),
+						rfile.getJyzId());
+				logger.info("start update idc information ... ：idcSize=" + idcList == null ? 0 : idcList.size());
+				if (idcList != null && idcList.size() > 0) {
+					for (IdcInformation idc : idcList) {
+						logger.info("start update idc information ... ：" + JSON.toJSONString(idc));
+						ResultDto result = idcApi.update(idc);
+						if (result != null) {
+							if (result.getResultCode() != 0) {
+								logger.error("call api fail - api return error : resultCode" + result.getResultCode()
+										+ ",statusCode=" + result.getStatusCode() + ",resultMsg="
+										+ result.getResultMsg());
+							}
+						}
+						logger.info("finished update idc information, result is " + JSON.toJSONString(idc));
+					}
+				}
+			}
+			if (!StringUtils.isBlank(rfile.getHouseId())) {
+				// 机房修改
+				List<HouseInformation> houseList = waitBaseInforDao.getHouseInformation(rfile.getSubmitId(),
+						rfile.getHouseId());
+				logger.info("start update house information ... ：houseSize" + houseList == null ? 0 : houseList.size());
+				if (houseList != null && houseList.size() > 0) {
+					logger.info("start update house information ... ：" + JSON.toJSONString(houseList));
+					List<ResultDto> resultList = houseApi.update(houseList);
+					if (resultList != null && resultList.size() > 0) {
+						int index = 0;
+						for (ResultDto result : resultList) {
+							HouseInformation hinfor = houseList.get(index);
+							if (result != null) {
+								if (result.getResultCode() != 0) {
+									logger.error("call api fail - api return error : resultCode"
+											+ result.getResultCode() + ",statusCode=" + result.getStatusCode()
+											+ ",resultMsg=" + result.getResultMsg());
+								}
+							}
+							// 更新子节点信息
+							doUpdateHouseChildrenStatus(hinfor, result);
+							index++;
+						}
+					}
+					logger.info("finished update house information : " + JSON.toJSONString(houseList));
+				}
+				if (!StringUtils.isBlank(rfile.getUserId())) {
+					// 用户修改
+					List<UserInformation> userList = waitBaseInforDao.getUserInformation(rfile.getSubmitId(),
+							rfile.getUserId());
+					logger.info("start update user information ... ：userSize" + userList == null ? 0 : userList.size());
+					if (userList != null && userList.size() > 0) {
+						logger.info("start update user information ... ：" + JSON.toJSONString(userList));
+						List<ResultDto> resultList = userApi.update(userList);
+						if (resultList != null && resultList.size() > 0) {
+							int index = 0;
+							for (ResultDto result : resultList) {
+								UserInformation userInfor = userList.get(index);
+								if (result != null) {
+									if (result.getResultCode() != 0) {
+										logger.error("call api fail - api return error : resultCode"
+												+ result.getResultCode() + ",statusCode=" + result.getStatusCode()
+												+ ",resultMsg=" + result.getResultMsg());
+									}
+								}
+								doUpdateUserChildrenStatus(userInfor, result);
+								index++;
+							}
+						}
+						logger.info("finished update house information : " + JSON.toJSONString(userList));
+					}
+				}
+			}
+		}// 删除流程
+		else if (reportType == 3) {
+			if (!StringUtils.isBlank(rfile.getJyzId())) {
+				// 经营者删除
+				List<IdcInformation> idcList = waitBaseInforDao.getIdcInformation(rfile.getSubmitId(),
+						rfile.getJyzId());
+				logger.info("start delete idc information ... ：idcSize=" + idcList == null ? 0 : idcList.size());
+				if (idcList != null && idcList.size() > 0) {
+					for (IdcInformation idc : idcList) {
+						if (idc.getOperateType() != 3) { // 必须等待表为删除，才能删除经营者
+							continue;
+						}
+						// 删除上报表
+						if (idc.getJyzId() != null && idc.getJyzId() > 0) {
+							logger.info("start delete idc information ... ：" + JSON.toJSONString(idc));
+							ResultDto result = idcApi.delete(idc.getJyzId());
+							if (result != null) {
+								if (result.getResultCode() != 0) {
+									logger.error("call api fail - api return error : resultCode"
+											+ result.getResultCode() + ",statusCode=" + result.getStatusCode()
+											+ ",resultMsg=" + result.getResultMsg());
+								}
+							}
+							logger.info("finished delete idc information : " + idc.getJyzId());
+						}
+						// 删除操作表
+						logger.info("start delete idc information of report db(clear all basic data) ... ："
+								+ JSON.toJSONString(idc));
+						operatorTablesDao.deleteJyz(idc.getJyzId().longValue());
+						logger.info("start delete idc information of report db(clear all basic data) ... ："
+								+ JSON.toJSONString(idc));
+					}
+				}
+			}
+			if (!StringUtils.isBlank(rfile.getHouseId())) {
+				// 机房删除
+				List<HouseInformation> houseList = waitBaseInforDao.getHouseInformation(rfile.getSubmitId(),
+						rfile.getHouseId());
+				logger.info("start delete house information ... ：houseSize" + houseList == null ? 0 : houseList.size());
+				List<Integer> houseIds = houseList.stream().map(house -> house.getHouseId().intValue())
+						.collect(Collectors.toList());
+				if (houseIds != null && houseIds.size() > 0) {
+					logger.info("start delete house information ... : houseIds = " + houseIds);
+					List<ResultDto> resultList = houseApi.delete(houseIds);
+					if (resultList != null && resultList.size() > 0) {
+						int index = 0;
+						for (ResultDto result : resultList) {
+							HouseInformation hinfor = houseList.get(index);
+							if (result != null) {
+								if (result.getResultCode() != 0) {
+									logger.error("call api fail - api return error : resultCode"
+											+ result.getResultCode() + ",statusCode=" + result.getStatusCode()
+											+ ",resultMsg=" + result.getResultMsg());
+								}
+							}
+							// 更新子节点信息
+							doUpdateHouseChildrenStatus(hinfor, result);
+							index++;
+						}
+					}
+					logger.info("finished delete house information : houseIds = " + houseIds);
+					// 删除操作表
+					operatorTablesDao.deleteHouses(houseIds);
+				}
+			}
+			if (!StringUtils.isBlank(rfile.getUserId())) {
+				// 用户删除
+				List<UserInformation> userList = waitBaseInforDao.getUserInformation(rfile.getSubmitId(),
+						rfile.getUserId());
+				logger.info("start delete user information ... ：userSize" + userList == null ? 0 : userList.size());
+				List<Long> userIds = userList.stream().map(user -> user.getUserId()).collect(Collectors.toList());
+				if (userIds != null && userIds.size() > 0) {
+					logger.info("start delete user information ... : userIds = " + userIds);
+					List<ResultDto> resultList = userApi.delete(userIds);
+					if (resultList != null && resultList.size() > 0) {
+						int index = 0;
+						for (ResultDto result : resultList) {
+							UserInformation userInfor = userList.get(index);
+							if (result != null) {
+								if (result.getResultCode() != 0) {
+									logger.error("call api fail - api return error : resultCode"
+											+ result.getResultCode() + ",statusCode=" + result.getStatusCode()
+											+ ",resultMsg=" + result.getResultMsg());
+								}
+							}
+							doUpdateUserChildrenStatus(userInfor, result);
+							index++;
+						}
+					}
+					logger.info("finished delete user information : userIds = " + userIds);
+
+					// 删除操作表
+					operatorTablesDao.deleteUsers(userIds);
+				}
+			}
+		}
+	}
+
+	public static void main(String[] args) {
+		List<String> list = new ArrayList<>();
+		list.add("one");
+		list.add("two");
+		list.add("three");
+		List<String> strList = list.stream().filter(a->!a.equals("two")).collect(Collectors.toList());
+		System.out.print(StringUtils.join(strList, ","));
+	}
+	
+	/**
+	 * 更新机房下的子节点状态
+	 * 
+	 * @param hinfor
+	 * @param result
+	 */
+	private void doUpdateHouseChildrenStatus(HouseInformation hinfor, ResultDto result) {
+		int status = 0; // 0-未上报；1-已上报
+		if(result != null && result.getResultCode() == 0){
+			status = 1;
+		}
+		List<HouseIPSegmentInformation> ipSegList = hinfor.getIpSegList();
+		if (ipSegList != null) {
+			List<Long> ipsegIdUpdateList = ipSegList.stream().map(a->a.getOperateType()!=3?a.getIpSegId():null).filter(a -> a != null).collect(Collectors.toList());
+			int update = operatorStatusDao.updateHouseIpsegDealFlag(ipsegIdUpdateList, status);
+			logger.info("update house ipseg deal_flag : houseId = "+hinfor.getHouseId()+",dealFlag="+status+",updateCount="+update);
+			
+			if(status==1){
+				List<Long> ipsegIdDeleteList = ipSegList.stream().map(a->a.getOperateType()==3?a.getIpSegId():null).filter(a -> a != null).collect(Collectors.toList());
+				int delete = operatorStatusDao.deleteHouseIpsegByIds(StringUtils.join(ipsegIdDeleteList,","));
+				logger.info("delete house ipseg deal_flag : houseId = "+hinfor.getHouseId()+",dealFlag="+status+",deleteCount="+delete);
+			}
+		}
+		List<HouseFrameInformation> frameList = hinfor.getFrameList();
+		if(frameList != null) {
+			List<Long> frameIdUpdateList = frameList.stream().map(a->a.getOperateType()!=3?a.getFrameId():null).filter(a -> a != null).collect(Collectors.toList());
+			int update = operatorStatusDao.updateHouseFrameDealFlag(frameIdUpdateList, status);
+			logger.info("update house frame deal_flag : houseId = "+hinfor.getHouseId()+",dealFlag="+status+",updateCount="+update);
+		
+			if(status==1){
+				List<Long> frameIdDeleteList = frameList.stream().map(a->a.getOperateType()==3?a.getFrameId():null).filter(a -> a != null).collect(Collectors.toList());
+				int delete = operatorStatusDao.deleteHouseFrameByIds(StringUtils.join(frameIdDeleteList,","));
+				logger.info("delete house frame deal_flag : houseId = "+hinfor.getHouseId()+",dealFlag="+status+",deleteCount="+delete);
+			}
+		}
+		List<HouseGatewayInformation> gatewayInfoList = hinfor.getGatewayInfoList();
+		if(gatewayInfoList != null) {
+			List<Long> gatewayUpdateIdList = gatewayInfoList.stream().map(a->a.getOperateType()!=3?a.getGatewayId():null).filter(a -> a != null).collect(Collectors.toList());
+			int update = operatorStatusDao.updateHouseGatewayDealFlag(gatewayUpdateIdList, status);
+			logger.info("update house gateway deal_flag : houseId = "+hinfor.getHouseId()+",dealFlag="+status+",updateCount="+update);
+		
+			if(status==1){
+				List<Long> gatewayDeleteIdList = gatewayInfoList.stream().map(a->a.getOperateType()==3?a.getGatewayId():null).filter(a -> a != null).collect(Collectors.toList());
+				int delete = operatorStatusDao.deleteHouseLinkByIds(StringUtils.join(gatewayDeleteIdList,","));
+				logger.info("delete house gateway deal_flag : houseId = "+hinfor.getHouseId()+",dealFlag="+status+",deleteCount="+delete);
+			}
+		}
+	}
+
+	/**
+	 * 更新用户下的子节点状态
+	 * 
+	 * @param userInfor
+	 * @param result
+	 */
+	private void doUpdateUserChildrenStatus(UserInformation userInfor, ResultDto result) {
+		int status = 0; // 0-未上报；1-已上报
+		if(result != null && result.getResultCode() == 0){
+			status = 1;
+		}
+		List<UserServiceInformation> serviceList = userInfor.getServiceList();
+		if (serviceList != null) {
+			List<Long> serviceIdList = serviceList.stream().map(a->a.getOperateType()!=3?a.getServiceId():null).filter(a -> a != null).collect(Collectors.toList());
+			int cnt = operatorStatusDao.updateUserServiceDealFlag(serviceIdList, status);
+			logger.info("update user service deal_flag : userId = "+userInfor.getUserId()+",dealFlag="+status+",updateCount="+cnt);
+		
+			if(status==1){
+				List<Long> serviceDeleteIdList = serviceList.stream().map(a->a.getOperateType()==3?a.getServiceId():null).filter(a -> a != null).collect(Collectors.toList());
+				int delete = operatorStatusDao.deleteUserServiceByIds(StringUtils.join(serviceDeleteIdList,","));
+				logger.info("delete user service deal_flag : userId = "+userInfor.getUserId()+",dealFlag="+status+",deleteCount="+delete);
+			}
+		}
+		List<UserBandwidthInformation> bandwidthList = userInfor.getBandwidthList();
+		if(bandwidthList != null) {
+			List<Long> hhIdList = bandwidthList.stream().map(a->a.getOperateType()!=3?a.getHhId():null).filter(a -> a != null).collect(Collectors.toList());
+			int cnt = operatorStatusDao.updateUserHHDealFlag(hhIdList, status);
+			logger.info("update user bandwidth deal_flag : userId = "+userInfor.getUserId()+",dealFlag="+status+",updateCount="+cnt);
+		
+			if(status==1){
+				List<Long> bandWidthDeleteIdList = bandwidthList.stream().map(a->a.getOperateType()==3?a.getHhId():null).filter(a -> a != null).collect(Collectors.toList());
+				int delete = operatorStatusDao.deleteBandWidthByIds(StringUtils.join(bandWidthDeleteIdList,","));
+				logger.info("delete user bandwidth deal_flag : userId = "+userInfor.getUserId()+",dealFlag="+status+",deleteCount="+delete);
+			}
+		}
+		List<UserVirtualInformation> virtualList = userInfor.getVirtualList();
+		if(virtualList != null) {
+			List<Long> virtualIdList = virtualList.stream().map(a->a.getOperateType()!=3?a.getVirtualId():null).filter(a -> a != null).collect(Collectors.toList());
+			int cnt = operatorStatusDao.updateUserVirtualDealFlag(virtualIdList, status);
+			logger.info("update user virtual deal_flag : userId = "+userInfor.getUserId()+",dealFlag="+status+",updateCount="+cnt);
+		
+			if(status==1){
+				List<Long> virtualDeleteIdList = virtualList.stream().map(a->a.getOperateType()==3?a.getVirtualId():null).filter(a -> a != null).collect(Collectors.toList());
+				int delete = operatorStatusDao.deletUserVirtualByIds(StringUtils.join(virtualDeleteIdList,","));
+				logger.info("delete user virtual deal_flag : userId = "+userInfor.getUserId()+",dealFlag="+status+",deleteCount="+delete);
+			}
+		}
+	}
+
+	/**
+	 * 清除缓存
+	 * 
+	 * @param rfile
+	 */
+	private void deleteCache(IsmsWaitSubmitReportFile rfile) {
+		try {
+			// 1. 查询缓存记录表记录(与rfile中的记录取交集)
+			List<OperatorCache> oclist = operatorCacheDao.getOperatorCache(rfile.getJyzId(), rfile.getHouseId(),
+					rfile.getUserId());
+			if (oclist == null || oclist.isEmpty()) {
+				// 无交集，不用重新调用预审模块
+				return;
+			}
+			List<Long> tlist = parseHouseId(oclist);
+			// 机房：删除缓存记录表中的交集部分记录
+			int cn = operatorCacheDao.deleteOperatorCacheByHouseId(tlist);
+			logger.info("delete " + cn + " operator cache by houseId : " + tlist);
+			tlist = parseUserId(oclist);
+			// 用户：除缓存记录表中的交集部分记录
+			cn = operatorCacheDao.deleteOperatorCacheByUserId(tlist);
+			logger.info("delete " + cn + " operator cache by userId : " + tlist);
+		} catch (Throwable e) {
+			logger.warn("delete oprator cache found exception", e);
+		}
+	}
+
+	/**
+	 * 缓存刷新
+	 * 
+	 * @param rfile
+	 */
+	private void refreshCache(IsmsWaitSubmitReportFile rfile) {
+		try {
+			// 1. 查询缓存记录表记录(与rfile中的记录取交集)
+			List<OperatorCache> oclist = operatorCacheDao.getOperatorCache(rfile.getJyzId(), rfile.getHouseId(),
+					rfile.getUserId());
+			if (oclist == null || oclist.isEmpty()) {
+				// 无交集，不用重新调用预审模块
+				return;
+			}
+			IPreinputService ipService = BaseFeignBuilder.getCacheFeign(IPreinputService.class,
+					IPreinputService.CLIENT_NAME, new PreinputServiceFallback(), EncodeDecodeType.EDT_PLAIN_JSON);
+
+			// 经营者自己不会写缓存表，因此此时不做自动预审
+			/*
+			 * // 经营者:交集部分调用预审API List<Long> tlist = parseJyzId(oclist);
+			 * for(Long jyzId : tlist){ ResultDto rs =
+			 * ipService.idcApprove(jyzId.intValue()); if(rs == null ||
+			 * rs.getResultCode() == ResultDto.ResultCodeEnum.ERROR.getCode()){
+			 * logger.error("idcinfo approve fail : " + rs); } } //
+			 * 经营者：除缓存记录表中的交集部分记录 int cn =
+			 * operatorCacheDao.deleteOperatorCacheByJyzId(tlist);
+			 * logger.info("delete " + cn + " operator cache by jyzId : " +
+			 * tlist);
+			 */
+
+			// 机房：交集部分调用预审API
+			List<Long> tlist = parseHouseId(oclist);
+			for (Long houseId : tlist) {
+				ResultDto rs = ipService.houseApprove(houseId.toString());
+				// 机房提交预审失败，后依然需要删除缓存
+				if (rs == null || rs.getResultCode() == ResultDto.ResultCodeEnum.ERROR.getCode()) {
+					logger.error("house approve fail : " + rs);
+				}
+			}
+			// 机房：删除缓存记录表中的交集部分记录
+			int cn = operatorCacheDao.deleteOperatorCacheByHouseId(tlist);
+			logger.info("delete " + cn + " operator cache by houseId : " + tlist);
+
+			// 用户:交集部分调用预审API
+			tlist = parseUserId(oclist);
+			for (Long userId : tlist) {
+				ResultDto rs = ipService.userApprove(userId.toString());
+				if (rs == null || rs.getResultCode() == ResultDto.ResultCodeEnum.ERROR.getCode()) {
+					logger.error("idcinfo approve fail : " + rs);
+				}
+			}
+			// 用户：除缓存记录表中的交集部分记录
+			cn = operatorCacheDao.deleteOperatorCacheByUserId(tlist);
+			logger.info("delete " + cn + " operator cache by userId : " + tlist);
+		} catch (Throwable e) { // 此模块的异常不能影响后续逻辑的执行，此处捕获所有异常，并写日志
+			logger.error("clear operator cache fail", e);
+		}
+	}
+
+	@SuppressWarnings("unused")
+	private List<Long> parseJyzId(List<OperatorCache> oclist) {
+		List<Long> list = new ArrayList<Long>();
+		if (oclist == null || oclist.isEmpty()) {
+			return list;
+		}
+		for (OperatorCache oc : oclist) {
+			if (oc.getJyzId() != null && oc.getJyzId() > 0) {
+				list.add(oc.getJyzId());
+			}
+		}
+		return list;
+	}
+
+	private List<Long> parseUserId(List<OperatorCache> oclist) {
+		List<Long> list = new ArrayList<Long>();
+		if (oclist == null || oclist.isEmpty()) {
+			return list;
+		}
+		for (OperatorCache oc : oclist) {
+			if (oc.getUserId() != null && oc.getUserId() > 0) {
+				list.add(oc.getUserId());
+			}
+		}
+		return list;
+	}
+
+	private List<Long> parseHouseId(List<OperatorCache> oclist) {
+		List<Long> list = new ArrayList<Long>();
+		if (oclist == null || oclist.isEmpty()) {
+			return list;
+		}
+		for (OperatorCache oc : oclist) {
+			if (oc.getHouseId() != null && oc.getHouseId() > 0) {
+				list.add(oc.getHouseId());
+			}
+		}
+		return list;
+	}
+
+	/**
+	 * 查询管局返回的某个文件在WAIT_ISMS_SUBMIT_REPORTFILE表中存的记录
+	 * 
+	 * @param fileName
+	 * @return
+	 */
+	private IsmsWaitSubmitReportFile getReportFileInfo(String fileName) {
+		return submitReportFileDao.getReportFileInfo(fileName);
+	}
+
+}

@@ -1,0 +1,601 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.aotain.cu.serviceapi.model.*;
+import com.aotain.cu.utils.StringUtil;
+import com.aotain.cu.utils.ThreadLocalUtil;
+import com.aotain.smmsapi.task.constant.DealFlagConstant;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateHouseDao;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateHouse;
+import com.aotain.smmsapi.task.utils.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+@Service
+public class PreValidateHouseImpl implements PreValidateHouse {
+
+    private static Logger logger = LoggerFactory.getLogger(PreValidateHouseImpl.class);
+
+    @Autowired
+    private PreValidateHouseDao preValidateHouseDao;
+
+    @Autowired
+    private PreValidateUserImpl preValidateUser;
+
+    private IdcInformation idcInformation;
+
+    private static int houseTotalCnt;
+
+    //已经核验的用户(不代表验证通过)
+    private static List<UserInformation> verifiedUsers=new ArrayList<UserInformation>();
+    //等待上报的机房
+    private List<HouseInformation> houseBatchConstructs =new ArrayList<HouseInformation>();
+	//等待上报的用户
+    private List<UserInformation> userBatchConstructs =new ArrayList<UserInformation>();
+	//核验不通过，需要继续等待的机房
+    private Map<String,HouseInformation> failHouseList =new HashMap<String,HouseInformation>();
+	//用户挂钩的机房-无法上报的 user hascode id house
+    private Map<Integer,Map<Long,Set<HouseInformation>>> unReportUserAndHouse =new HashMap<Integer,Map<Long,Set<HouseInformation>>>();
+
+    public IdcInformation getIdcInformation() {
+        return idcInformation;
+    }
+
+    public void setIdcInformation( IdcInformation idcInformation ) {
+        this.idcInformation = idcInformation;
+    }
+
+    public List<HouseInformation> getHouseBatchConstructs() {
+        return houseBatchConstructs;
+    }
+
+    private StringBuilder vmsg;
+
+	@Override
+	public void handleValidateHouse() {
+		try {
+			// 初始化
+			verifiedUsers.clear();
+			houseBatchConstructs.clear();
+			userBatchConstructs.clear();
+			unReportUserAndHouse.clear();
+			failHouseList.clear();
+			houseTotalCnt = 0;
+			vmsg=new StringBuilder();
+
+			HouseInformation param = new HouseInformation();
+			param.setDealFlag(DealFlagConstant.RPT_VARIFY.getDealFlag());
+			if (getIdcInformation() != null)
+				param.setJyzId(getIdcInformation().getJyzId());
+			// 获取相关经营者下面的上报审核中的机房
+			List<HouseInformation> houseInformations = getValidateObj(param);
+			// 上报审核中的机房总数量
+			houseTotalCnt = houseInformations == null ? 0 : houseInformations.size();
+			logger.info("[DataValidate]The waiting room size is : " + houseTotalCnt);
+			preValidateUser.setFailHouseList(new HashMap<>());//清空之前的失败机房
+			preValidateUser.setHouseBatchConstructs(new ArrayList<>());//清空之前的成功机房
+			if (houseInformations != null && !houseInformations.isEmpty()) {
+				for (HouseInformation houseInformation : houseInformations) {
+					if (houseInformation.getDealFlag() == DealFlagConstant.UN_PRE_VARIFY.getDealFlag()) {
+						// 机房状态为【未预审】，跳过
+						continue;
+					}
+					// 如果机房核验(handHouseInfo)通过
+					DealFlagConstant.StatusEnum status = handHouseInfo(houseInformation);
+					if (status.getStatus() == DealFlagConstant.StatusEnum.SUCCESS.getStatus()) {
+						// DO nothing
+					}else {
+						failHouseList.put(houseInformation.getHouseName(),houseInformation);
+					}
+				}
+			}
+
+			if (!houseBatchConstructs.isEmpty()){
+				Iterator<HouseInformation> it= houseBatchConstructs.iterator();
+				for (;it.hasNext();){
+					HouseInformation house= it.next();
+					List<UserInformation> users =house.getBelongUsers();
+					if (users!=null && !users.isEmpty()) {
+						loop:
+						for (UserInformation userInformation : users) {
+							if (unReportUserAndHouse.get(userInformation.hashCode()) != null) {
+								//预审通过的机房对应的用户存在用户不上报的缓存中,则移除该机房上报资格
+								it.remove();
+								failHouseList.put(house.getHouseName(), house);
+								break loop;
+							}
+						}
+					}
+				}
+			}
+			if (!userBatchConstructs.isEmpty()){
+				Iterator<UserInformation> it = userBatchConstructs.iterator();
+				for (;it.hasNext();){
+					UserInformation userInformation = it.next();
+					if (unReportUserAndHouse.get(userInformation.hashCode())!=null){
+						it.remove();
+					}
+				}
+			}
+
+			ThreadLocalUtil.set("houseSuccessCnt", houseBatchConstructs.size());
+			ThreadLocalUtil.set("houseTotalCnt", houseTotalCnt);
+			preValidateUser.setAreadyVerifyByHouse(verifiedUsers);
+			preValidateUser.setUserBatchConstructs(userBatchConstructs);
+			preValidateUser.setHouseBatchConstructs(houseBatchConstructs);
+			preValidateUser.setFailHouseList(failHouseList);
+			preValidateUser.setUnReportUserAndHouse(unReportUserAndHouse);
+			// 核验用户
+			preValidateUser.handleValidateUser();
+		} catch (Exception e) {
+			logger.error("handle validate House error ", e);
+		}
+	}
+    /**
+     * 获取需要核验的对象
+     * @param houseInformation
+     * @return
+     */
+    public List<HouseInformation> getValidateObj( HouseInformation houseInformation){
+        try {
+            List<HouseInformation> houseInformations = preValidateHouseDao.getValidateHouseList(houseInformation);
+            return houseInformations;
+        }catch (Exception e){
+            logger.error("get validate House error ",e);
+        }
+        return null;
+    }
+
+    /**
+     * 核验机房主体增改删业务
+     * @param houseInformation
+     * @return
+     */
+	@Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+	@Override
+	public DealFlagConstant.StatusEnum handHouseInfo(HouseInformation houseInformation) {
+		DealFlagConstant.StatusEnum resultStatus = DealFlagConstant.StatusEnum.WAITING;
+		if (houseInformation == null) {
+			resultStatus = DealFlagConstant.StatusEnum.WAITING;
+		}
+		int houseNum;
+		HouseInformation house = new HouseInformation();
+		List<UserInformation> waitingUser;
+		switch (houseInformation.getOperateType()) {
+		// 新增
+		case 1:
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] newly validate starting......");
+			house.setHouseIdStr(houseInformation.getHouseIdStr());
+			house.setHouseName(houseInformation.getHouseName());
+			houseNum = preValidateHouseDao.houseNum(house);
+			if (houseNum > 0) {
+				// 正式表存在该机房 核验失败 写数据库
+				houseInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" 上报表存在机房[" + houseInformation.getHouseName() + "]信息，新增上报失败");
+				houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+				preValidateHouseDao.submitHouse(houseInformation);
+				resultStatus = DealFlagConstant.StatusEnum.FAIL;
+			} else {
+				// 获取机房下的所有用户信息
+				List<UserInformation> users = preValidateHouseDao.getPreUsers(houseInformation);
+				// List<UserInformation> users = getUsersByHouseInfo(houseInformation);
+				if (validateSegUser(houseInformation,users)== DealFlagConstant.StatusEnum.FAIL){
+					return DealFlagConstant.StatusEnum.FAIL;
+				}
+				if (users == null || users.isEmpty()) {
+					//机房下没有用户
+					logger.info("[DataValidate]The house [" + houseInformation.getHouseName() + "] has not user to validate!");
+					houseBatchConstructs.add(houseInformation);
+					resultStatus = DealFlagConstant.StatusEnum.SUCCESS;
+				} else {
+					List<UserInformation> onVerifyUser = new ArrayList<UserInformation>();
+					List<UserInformation> reportUserSuccessUser = new ArrayList<UserInformation>();
+					waitingUser = new ArrayList<UserInformation>();
+					for (UserInformation userInformation : users) {
+						// 0 1 3 6 未预审或者失败的
+						if (userInformation.getDealFlag().intValue() == DealFlagConstant.UN_PRE_VARIFY.getDealFlag()
+								|| userInformation.getDealFlag().intValue() == DealFlagConstant.PRE_VARIFY_FAIL.getDealFlag()
+								|| userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag()
+								|| userInformation.getDealFlag().intValue() == DealFlagConstant.SUB_RPT.getDealFlag()
+								|| userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_FAIL.getDealFlag()) {
+							waitingUser.add(userInformation);
+						} else if (userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_VARIFY.getDealFlag()) {
+							onVerifyUser.add(userInformation);
+						} else if (userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_SUCCESS.getDealFlag()) {
+							reportUserSuccessUser.add(userInformation);
+						}
+					}
+					/*if (users.size() == reportUserSuccessUser.size()) {
+						//机房下的用户全部为【上报成功】的状态
+						resultStatus = DealFlagConstant.StatusEnum.SUCCESS;
+					} else {*/
+						resultStatus = handleHouseAndUsers(houseInformation, onVerifyUser, waitingUser);
+//					}
+				}
+			}
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] newly validate end, status is [" + resultStatus + "]......");
+			return resultStatus;
+		case 2:
+			// 修改
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] update validate starting......");
+			house.setHouseId(houseInformation.getHouseId());
+			houseNum = preValidateHouseDao.houseNum(house);
+			if (houseNum != 1) {
+				// 正式表不存在该机房 核验失败 写数据库
+				houseInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" 上报表不存在机房[" + houseInformation.getHouseName() + "]信息，变更上报失败");
+				houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+				preValidateHouseDao.submitHouse(houseInformation);
+				resultStatus = DealFlagConstant.StatusEnum.FAIL;
+			} else {
+				// 正式表存在该机房 ,identity==1？提取机房IP地址的所属客户信息:提取机房IP地址的所属客户信息+提取机房机架的所属客户信息
+				// TODO: 分两种情况处理
+				List<UserInformation> users = preValidateHouseDao.getPreUsers(houseInformation);
+				/*if (houseInformation.getIdentity() != 1) {
+					// IDC机房时，提取机房IP地址的所属客户信息+提取机房机架的所属客户信息
+					users = preValidateHouseDao.getPreUsers(houseInformation);
+				} else {
+					// 专线机房时，提取机房IP地址的所属客户信息
+					houseInformation.setUserFrameList(new ArrayList<HouseUserFrameInformation>());
+					users = preValidateHouseDao.getPreUsers(houseInformation);
+				}*/
+				if (validateSegUser(houseInformation,users)== DealFlagConstant.StatusEnum.FAIL){
+					return DealFlagConstant.StatusEnum.FAIL;
+				}
+				List<UserInformation> onverifyUser = new ArrayList<UserInformation>();
+				/**
+				 * 此处代码默认是逻辑删除，新增，修改，删除直接看子类的czlx
+				 */
+				if (users == null || users.isEmpty()) {
+					logger.info("[DataValidate]The house [" + houseInformation.getHouseName() + "] has not user to validate!");
+					houseBatchConstructs.add(houseInformation);
+					resultStatus = DealFlagConstant.StatusEnum.SUCCESS;
+				} else {
+					List<UserInformation> reportUserSuccessUser = new ArrayList<UserInformation>();
+					waitingUser = new ArrayList<UserInformation>();
+					for (UserInformation userInformation : users) {
+						if (!(userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_VARIFY.getDealFlag()
+								|| userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_SUCCESS.getDealFlag()
+//								|| userInformation.getDealFlag().intValue() == DealFlagConstant.SUB_RPT.getDealFlag()
+						)) {
+							// 如存在状态不是上报成功或者上报审核中的记录,等待
+							waitingUser.add(userInformation);
+						} else if (userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_VARIFY.getDealFlag()) {
+							onverifyUser.add(userInformation);
+						} else if (userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_SUCCESS.getDealFlag()) {
+							//用户全部为【上报成功】的状态
+							//如果用户全部为【上报成功】【提交上报】呢?
+							reportUserSuccessUser.add(userInformation);
+						}
+					}
+					/*if (users.size() == reportUserSuccessUser.size()) {
+						//机房下的用户全部为【上报成功】的状态
+						resultStatus = DealFlagConstant.StatusEnum.SUCCESS;
+					} else {*/
+					resultStatus = handleHouseAndUsers(houseInformation, onverifyUser, waitingUser);
+					/*}*/
+				}
+			}
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] update validate end, status is [" + resultStatus + "]......");
+			return resultStatus;
+		case 3:
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] delete validate starting......");
+			house.setHouseId(houseInformation.getHouseId());
+			houseNum = preValidateHouseDao.houseNum(house);
+			if (houseNum != 1) {
+				// 正式表不存在该机房 核验失败 写数据库
+				houseInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" [机房名称:" + houseInformation.getHouseName() + "]未找到上报信息，删除失败");
+				houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+				preValidateHouseDao.submitHouse(houseInformation);
+				resultStatus = DealFlagConstant.StatusEnum.FAIL;
+			} else {
+				// 提取机房IP地址的所属客户信息+提取机房机架的所属客户信息
+				List<UserInformation> preUsers = preValidateHouseDao.getPreUsers(houseInformation);
+//				if (validateSegUser(houseInformation,preUsers)== DealFlagConstant.StatusEnum.FAIL){
+//					return DealFlagConstant.StatusEnum.FAIL;
+//				}
+				waitingUser = new ArrayList<UserInformation>();
+				List<UserInformation> onverifyUser = new ArrayList<UserInformation>();
+				// 机房下面的用户不为空的时候,核验所有用户是否提交上报或者上报成功的
+				if (preUsers == null || preUsers.isEmpty()) {
+					logger.info("[DataValidate]The house [" + houseInformation.getHouseName() + "] has not user to validate!");
+					houseBatchConstructs.add(houseInformation);
+					resultStatus = DealFlagConstant.StatusEnum.SUCCESS;
+				} else {
+					for (UserInformation userInformation : preUsers) {
+						// 非上报审核中 或者非上报成功 或者非提交上报的
+						if (!(userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_VARIFY.getDealFlag()
+								|| userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_SUCCESS.getDealFlag()
+//								|| userInformation.getDealFlag().intValue() == DealFlagConstant.SUB_RPT.getDealFlag()
+						)) {
+							// 核验不成功，等待
+							waitingUser.add(userInformation);
+						} else if (userInformation.getDealFlag().intValue() == DealFlagConstant.RPT_VARIFY.getDealFlag()) {
+							onverifyUser.add(userInformation);
+						}
+					}
+					resultStatus = handleHouseAndUsers(houseInformation, onverifyUser, waitingUser);
+				}
+			}
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] delete validate end, status is [" + resultStatus + "]......");
+			return resultStatus;
+		}
+		return resultStatus;
+	}
+
+    /**
+     * 对上报审核中的用户进行核验（且没有失败的），全部通过则写机房主体和用户主体等待表，记录表，kafka，否则提示机房下面失败，未预审的用户
+     * @param houseInformation
+     * @param onverifyUser
+     * @param unVerifyUser
+     * @return
+     */
+	public DealFlagConstant.StatusEnum handleHouseAndUsers(HouseInformation houseInformation, List<UserInformation> onverifyUser, List<UserInformation> unVerifyUser) {
+		List<UserInformation> verifyUser = new ArrayList<>();
+		if (!onverifyUser.isEmpty()) {
+			for (UserInformation userInformation : onverifyUser) {
+				// 调用户核验,核验通过，对用户核验对象里面的成功次数+1
+				List<UserInformation> reallyObj = preValidateUser.getValidateObj(userInformation);
+				if (reallyObj != null && !reallyObj.isEmpty()) {
+					UserInformation reallyUsers = reallyObj.get(0);
+					DealFlagConstant.StatusEnum status = preValidateUser.handUserInfo(reallyUsers,true);
+					if (status.getStatus() == DealFlagConstant.StatusEnum.SUCCESS.getStatus()) {
+						verifyUser.add(reallyUsers);
+//						userSuccessCnt++;
+					} else {
+						// 核验不通过的直接 追加到unVerifyUser中
+						userInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+						unVerifyUser.add(reallyUsers);
+//						userFailCnt++;
+					}
+				}
+			}
+		}
+		// 如果核验不通过的（unVerifyUser）是空的,说明该机房下面的所有用户（以及用户所对应的机房）是核验通过的
+		// 则写机房的记录表，等待表，kafka(writeHouseSuccessLog)
+		// ,所有用户也写记录表，等待表，kafka(preValidateUser.writeUserSuccessLog)
+		if (unVerifyUser.isEmpty()) {
+			houseInformation.setBelongUsers(verifyUser);
+			houseBatchConstructs.add(houseInformation);
+			userBatchConstructs.addAll(verifyUser);
+			verifiedUsers.addAll(verifyUser);
+
+			return DealFlagConstant.StatusEnum.SUCCESS;
+		} else {
+			// 如果尚有核验不通过，或者本身失败，未预审的用户,更新机房主体提示信息，
+			// 但是已经核验过的用户，在接下来的用户核验中直接略过
+			verifiedUsers.addAll(verifyUser);
+
+			StringBuilder sb = new StringBuilder();
+			for (UserInformation userInformation : unVerifyUser) {
+				sb.append(DateUtils.getCurrentyyyMMddHHmmss() +" " + constructErrorMsg(userInformation.getDealFlag(),userInformation.getUnitName())).append("\r\n");
+			}
+			HouseInformation param = new HouseInformation();
+			param.setHouseId(houseInformation.getHouseId());
+			param.setVerificationResultWithTimestamp(sb.toString());
+			preValidateHouseDao.submitHouse(param);
+
+			for (UserInformation userInformation:unVerifyUser){
+				addUnReportUserAndHouse(userInformation,houseInformation);
+			}
+			if (!onverifyUser.isEmpty()){
+				for (UserInformation userInformation:onverifyUser){
+					addUnReportUserAndHouse(userInformation,houseInformation);
+				}
+			}
+			return DealFlagConstant.StatusEnum.WAITING;
+		}
+	}
+
+	private void addUnReportUserAndHouse(UserInformation userInformation,HouseInformation houseInformation){
+//		该用户在unReportUserAndHouse存在
+		Set<HouseInformation> houses=null;
+		Map<Long,Set<HouseInformation>> users=null;
+		if ((users=unReportUserAndHouse.get(userInformation.hashCode()))!=null){
+			houses = users.get(userInformation.getUserId());
+			houses.add(houseInformation);
+			users.put(userInformation.getUserId(),houses);
+			unReportUserAndHouse.put(userInformation.hashCode(),users);
+		}else {
+			users = new HashMap<>();
+			houses = new HashSet<>();
+			houses.add(houseInformation);
+			users.put(userInformation.getUserId(),houses);
+			unReportUserAndHouse.put(userInformation.hashCode(),users);
+		}
+//		unReportUserAndHouse.put(userInformation.hashCode(), userInformation);
+	}
+	private int hashUser(String unitName,Integer idType,String idNumber) {
+		return Objects.hash(unitName, idType, idNumber);
+	}
+
+	private String userToStr(String unitName,Integer idType,String idNumber) {
+		return ""+unitName + (idType!=null?",证件类型:"+idType:"")+(idNumber!=null?",证件号码:"+idNumber:"")+"";
+	}
+
+	/**
+	 * 如果用户预审不通过，则提示：机房资源分配的[用户名称:test0001]预审不通过，请联系用户管理员核验该用户信息并预审成功，系统将自动关联用户上报。
+	 * 4）如果用户未预审，则提示：机房资源分配的[用户名称:XXXX]未预审，请联系用户管理员核验该用户信息并预审成功，系统将自动关联用户上报。
+	 * 5）如果上报失败，则提示：XXXX，请联系系统维护人员处理。
+	 * @return
+	 */
+	private String constructErrorMsg(int dealFlag,String userName){
+		if (dealFlag==DealFlagConstant.PRE_VARIFY_FAIL.getDealFlag()){
+			return String.format("机房资源分配的[用户名称:%s]预审不通过，请联系用户管理员核验该用户信息并预审成功，系统将自动关联用户上报。",userName);
+		}else if(dealFlag==DealFlagConstant.UN_PRE_VARIFY.getDealFlag()) {
+			return String.format("机房资源分配的[用户名称:%s]未预审，请联系用户管理员核验该用户信息并预审成功，系统将自动关联用户上报。",userName);
+		}else if (dealFlag==DealFlagConstant.RPT_FAIL.getDealFlag()) {
+			return String.format("机房资源分配的[用户名称:%s]未预审，请联系用户管理员核验该用户信息并预审成功，系统将自动关联用户上报。", userName);
+		}else if (dealFlag==DealFlagConstant.RPT_VARIFY.getDealFlag()){
+			return String.format("机房资源分配的[用户名称：%s]上报审核中，请联系用户管理员核验该用户信息并预审成功，系统将自动关联用户上报。", userName);
+		}else if (dealFlag==DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag()){
+			return String.format("机房资源分配的[用户名称：%s]上报审核不通过，请联系用户管理员核验该用户信息并预审成功，系统将自动关联用户上报。", userName);
+		}
+		return "";
+	}
+
+	/**
+	 * 核验IP或者机架分配的用户是否和系统存在的用户一一对应
+	 * @param houseInformation
+	 * @param preUsers
+	 * @return
+	 */
+	public DealFlagConstant.StatusEnum  validateSegUser(HouseInformation houseInformation,List<UserInformation> preUsers){
+		/**
+		 * IP或者机架分配的用户
+		 */
+		Map<Integer,HouseIPSegmentInformation> ipSegMap =new HashMap<Integer,HouseIPSegmentInformation>();
+		Map<Integer,HouseUserFrameInformation> frameSegMap =new HashMap<Integer,HouseUserFrameInformation>();
+		List<HouseIPSegmentInformation> ipUsers = houseInformation.getIpSegList();
+		List<HouseUserFrameInformation> framUsers = houseInformation.getUserFrameList();
+		for (HouseIPSegmentInformation ip:ipUsers) {
+			if (!StringUtil.isEmptyString(ip.getUserName())){
+				ipSegMap.put(hashUser(ip.getUserName(), null, null),ip);
+			}
+		}
+		for (HouseUserFrameInformation frame:framUsers){
+			if (!StringUtil.isEmptyString(frame.getUserName())){
+				frameSegMap.put(hashUser(frame.getUserName(), null, null),frame);
+			}
+		}
+		/**
+		 * ipSegMap frameSegMap IP或者机架分配的用户
+		 * preUser 该机房在系统中能找到的用户 ,通过与ipSegMap frameSegMap 比较找出有问题的用户
+		 */
+		StringBuilder vmsg = new StringBuilder();
+		StringBuilder failMsg = new StringBuilder();
+		if (preUsers == null || preUsers.isEmpty()) {
+			if (!ipSegMap.isEmpty()) {
+				//IP或者机架有分配用户，但是系统中找不到
+				ipSegMap.forEach(( key, value ) -> {
+					vmsg.append(DateUtils.getCurrentyyyMMddHHmmss() +" 机房IP分配的[用户名称:" + userToStr(value.getUserName(),value.getIdType(),value.getIdNumber()) + "]不存在，请联系用户管理员添加此用户并预审成功，系统将自动关联用户上报").append("\r\n");
+				});
+
+			}
+			if (!frameSegMap.isEmpty()) {
+				frameSegMap.forEach(( key, value ) -> {
+					vmsg.append(DateUtils.getCurrentyyyMMddHHmmss() +" 机房机架分配的[用户名称:" + userToStr(value.getUserName(),value.getIdType(),value.getIdNumber()) + "]不存在，请联系用户管理员添加此用户并预审成功，系统将自动关联用户上报").append("\r\n");
+				});
+			}
+			if (!StringUtil.isEmptyString(vmsg.toString())) {
+				houseInformation.setVerificationResultWithTimestamp(vmsg.toString());
+				preValidateHouseDao.submitHouse(houseInformation);
+
+				if (preUsers!=null&&!preUsers.isEmpty()){
+					for (UserInformation userInformation:preUsers){
+						addUnReportUserAndHouse(userInformation,houseInformation);
+					}
+				}
+
+				return DealFlagConstant.StatusEnum.FAIL;
+			}else {
+				return DealFlagConstant.StatusEnum.SUCCESS;
+			}
+		}else {
+			Map<Integer,List<UserInformation>> exitMap = new HashMap<Integer,List<UserInformation>>();
+			preUsers.forEach(userInformation -> {
+				List<UserInformation> list;
+				List<UserInformation> lastList ;
+				if ((list=exitMap.get(hashUser(userInformation.getUnitName(), null, null)))!=null){
+					lastList =new ArrayList<>();
+					lastList.addAll(list);
+					lastList.add(userInformation);
+					exitMap.put(hashUser(userInformation.getUnitName(), null, null),lastList);
+				}else {
+					exitMap.put(hashUser(userInformation.getUnitName(), null, null),Arrays.asList(userInformation));
+				}
+			});
+			if (!ipSegMap.isEmpty()) {
+				ipSegMap.forEach(( key, value ) -> {
+					List<UserInformation> findList=exitMap.get(key);
+					if (findList==null || findList.isEmpty()){
+						//该用户已经分配但是系统（booleanMap）中找不到
+						vmsg.append(DateUtils.getCurrentyyyMMddHHmmss() +" 机房IP分配的[用户名称:" + userToStr(value.getUserName(),value.getIdType(),value.getIdNumber()) + "]不存在，请联系用户管理员添加此用户并预审成功，系统将自动关联用户上报").append("\r\n");
+					}else if (findList.size()==1){
+						//找得到 do nothing
+					}else if (findList.size()>1){
+						AtomicBoolean flag=new AtomicBoolean(false);
+						if (value.getIdType()!=null && value.getIdNumber()!=null){
+							findList.forEach(finded->{
+								if (value.getIdType().intValue()==finded.getIdType().intValue() && value.getIdNumber().equals(finded.getIdNumber())){
+									//找到对应的用户
+									flag.set(true);
+								}
+							});
+
+							if (!flag.get()){
+								vmsg.append(DateUtils.getCurrentyyyMMddHHmmss() +" 机房IP分配的[用户名称:" + userToStr(value.getUserName(),value.getIdType(),value.getIdNumber()) + "]不存在，请联系用户管理员添加此用户并预审成功，系统将自动关联用户上报").append("\r\n");
+							}
+						}else {
+							//必须制定用户证件类型和证件号码
+							failMsg.append(DateUtils.getCurrentyyyMMddHHmmss() +" 机房IP分配的[用户名称:" + userToStr(value.getUserName(),value.getIdType(),value.getIdNumber()) + "]系统中存在多个，请补充对应用户名称的证件类型和号码后重新预审").append("\r\n");
+						}
+
+					}
+				});
+
+			}
+			if (!frameSegMap.isEmpty()) {
+				frameSegMap.forEach(( key, value ) -> {
+					List<UserInformation> findList=exitMap.get(key);
+					if (findList==null || findList.isEmpty()){
+						//该用户已经分配但是系统（booleanMap）中找不到
+						vmsg.append(DateUtils.getCurrentyyyMMddHHmmss() + " 机房机架分配的[用户名称:" + userToStr(value.getUserName(),value.getIdType(),value.getIdNumber()) + "]不存在，请联系用户管理员添加此用户并预审成功，系统将自动关联用户上报").append("\r\n");
+					}else if (findList.size()==1){
+						//找得到 do nothing
+					}else if (findList.size()>1){
+						AtomicBoolean flag=new AtomicBoolean(false);
+						if (value.getIdType()!=null && value.getIdNumber()!=null){
+							findList.forEach(finded->{
+								if (value.getIdType().intValue()==finded.getIdType().intValue() && value.getIdNumber().equals(finded.getIdNumber())){
+									//找到对应的用户
+									flag.set(true);
+								}
+							});
+
+							if (!flag.get()){
+								vmsg.append(DateUtils.getCurrentyyyMMddHHmmss() +" 机房机架分配的[用户名称:" + userToStr(value.getUserName(),value.getIdType(),value.getIdNumber()) + "]不存在，请联系用户管理员添加此用户并预审成功，系统将自动关联用户上报").append("\r\n");
+							}
+						}else {
+							//必须制定用户证件类型和证件号码
+							failMsg.append(DateUtils.getCurrentyyyMMddHHmmss() +" 机房机架分配的[用户名称:" + userToStr(value.getUserName(),value.getIdType(),value.getIdNumber()) + "]系统中存在多个，请补充对应用户名称的证件类型和号码后重新预审").append("\r\n");
+						}
+
+					}
+				});
+			}
+			if (!StringUtil.isEmptyString(vmsg.toString())) {
+				if (!StringUtil.isEmptyString(failMsg.toString())){
+					vmsg.append(failMsg);
+					houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+				}
+				houseInformation.setVerificationResultWithTimestamp(vmsg.toString());
+				preValidateHouseDao.submitHouse(houseInformation);
+				if (preUsers!=null&&!preUsers.isEmpty()){
+					for (UserInformation userInformation:preUsers){
+						addUnReportUserAndHouse(userInformation,houseInformation);
+					}
+				}
+				return DealFlagConstant.StatusEnum.FAIL;
+			}else {
+				if (!StringUtil.isEmptyString(failMsg.toString())){
+					houseInformation.setVerificationResultWithTimestamp(failMsg.toString());
+					houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+					preValidateHouseDao.submitHouse(houseInformation);
+					if (preUsers!=null&&!preUsers.isEmpty()){
+						for (UserInformation userInformation:preUsers){
+							addUnReportUserAndHouse(userInformation,houseInformation);
+						}
+					}
+					return DealFlagConstant.StatusEnum.FAIL;
+				}
+				return DealFlagConstant.StatusEnum.SUCCESS;
+			}
+		}
+	}
+
+}

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="idcInfoManage">
+		<xs:annotation>
+			<xs:documentation>基础数据管理指令</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="commandId" type="xs:long">
+					<xs:annotation>
+						<xs:documentation>指令编号ID</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="type" type="xs:integer">
+					<xs:annotation>
+						<xs:documentation>0——查询基础数据；1——保留；2——保留；3——查询基础数据的监测数据 </xs:documentation>
+					</xs:annotation> 
+				</xs:element>
+				<xs:element name="commandInfo">
+					<xs:annotation>
+						<xs:documentation>指令信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="queryMonitorDayFrom" type="xs:string" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>仅在查询监测数据时有效，采用yyyy-MM-dd格式 </xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="queryMonitorDayTo" type="xs:string" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>仅在查询监测数据时有效，采用yyyy-MM-dd格式上报的监测数据应含结束日期当天的数据</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="idcId" type="xs:string" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>IDC/ISP经营者ID</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="id" type="xs:long" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>此项内容不为空时，表示该指令对经营者下所有所有用户生效</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="houseId" type="xs:long" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>机房ID，当指令类型为1、2、3时，该节点必填。此项内容不为空时，表示该指令对经营者下所有机房和所有用户生效。</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="timestamp" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>生成时间</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

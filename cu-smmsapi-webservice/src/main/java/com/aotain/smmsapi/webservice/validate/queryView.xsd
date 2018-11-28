@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="queryView">
+		<xs:annotation>
+			<xs:documentation>活跃资源访问量查询指令</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="commandId" type="xs:long">
+					<xs:annotation>
+						<xs:documentation>指令惟一ID，该ID由SMMS产生</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="idcId" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>IDC/ISP经营者ID</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="type" type="xs:integer">
+					<xs:annotation>
+						<xs:documentation>查询类型1-顶级域名、2-子域名</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="content" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>查询内容</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="queryTime" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>查询截至时间</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="timeStamp" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>生成该查询指令的时间</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>
+

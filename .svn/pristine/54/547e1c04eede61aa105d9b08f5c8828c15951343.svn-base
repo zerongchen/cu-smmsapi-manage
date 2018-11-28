@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="noFilter">
+		<xs:annotation>
+			<xs:documentation>免过滤网站</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="idcId" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>IDC/ISP经营者ID</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="commandId" type="xs:long">
+					<xs:annotation>
+						<xs:documentation>指令ID</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="operationType" type="xs:integer">
+					<xs:annotation>
+						<xs:documentation>操作类型0——新增、1——删除</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="timeStamp" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>生成时间</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="contents" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>列表内容</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="type" type="xs:integer">
+					<xs:annotation>
+						<xs:documentation>列表类型1-域名、2-IP</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="level" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>规则优先级</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

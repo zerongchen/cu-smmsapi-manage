@@ -1,0 +1,183 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.aotain.cu.serviceapi.model.*;
+import com.aotain.cu.utils.ThreadLocalUtil;
+import com.aotain.smmsapi.task.constant.DealFlagConstant;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateHouseDao;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateHouse;
+import com.aotain.smmsapi.task.utils.DateUtils;
+import com.aotain.smmsapi.task.utils.WriteApproveProcess;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+
+@Service
+public class PreValidateHouseImpl implements PreValidateHouse {
+
+    private static Logger logger = LoggerFactory.getLogger(PreValidateHouseImpl.class);
+
+    @Autowired
+    private PreValidateHouseDao preValidateHouseDao;
+
+    @Autowired
+    private PreValidateUserImpl preValidateUser;
+
+    private IdcInformation idcInformation;
+
+    private static int houseTotalCnt;
+
+    //等待上报的机房
+    private List<HouseInformation> houseBatchConstructs =new ArrayList<HouseInformation>();
+
+    public IdcInformation getIdcInformation() {
+        return idcInformation;
+    }
+
+    public void setIdcInformation( IdcInformation idcInformation ) {
+        this.idcInformation = idcInformation;
+    }
+
+    public List<HouseInformation> getHouseBatchConstructs() {
+        return houseBatchConstructs;
+    }
+
+    private StringBuilder vmsg;
+
+	@Override
+	public void handleValidateHouse() {
+		try {
+			// 初始化
+			houseBatchConstructs.clear();
+			houseTotalCnt = 0;
+			vmsg=new StringBuilder();
+
+			HouseInformation param = new HouseInformation();
+			param.setDealFlag(DealFlagConstant.RPT_VARIFY.getDealFlag());
+			if (getIdcInformation() != null)
+				param.setJyzId(getIdcInformation().getJyzId());
+			// 获取相关经营者下面的上报审核中的机房
+			List<HouseInformation> houseInformations = getValidateObj(param);
+			// 上报审核中的机房总数量
+			houseTotalCnt = houseInformations == null ? 0 : houseInformations.size();
+			logger.info("[DataValidate]The waiting room size is : " + houseTotalCnt);
+			preValidateUser.setHouseBatchConstructs(new ArrayList<>());//清空之前的成功机房
+			if (houseInformations != null && !houseInformations.isEmpty()) {
+				for (HouseInformation houseInformation : houseInformations) {
+					if (houseInformation.getDealFlag() == DealFlagConstant.UN_PRE_VARIFY.getDealFlag()) {
+						// 机房状态为【未预审】，跳过
+						continue;
+					}
+					// 如果机房核验(handHouseInfo)通过
+					DealFlagConstant.StatusEnum status = handHouseInfo(houseInformation);
+					if (status.getStatus() == DealFlagConstant.StatusEnum.SUCCESS.getStatus()) {
+						houseBatchConstructs.add(houseInformation);
+						//提交上报的流水在上一层写等待表的时候写
+					}
+				}
+			}
+
+			ThreadLocalUtil.set("houseSuccessCnt", houseBatchConstructs.size());
+			ThreadLocalUtil.set("houseTotalCnt", houseTotalCnt);
+			preValidateUser.setHouseBatchConstructs(houseBatchConstructs);
+			// 核验用户
+			preValidateUser.handleValidateUser();
+		} catch (Exception e) {
+			logger.error("handle validate House error ", e);
+		}
+	}
+    /**
+     * 获取需要核验的对象
+     * @param houseInformation
+     * @return
+     */
+    public List<HouseInformation> getValidateObj( HouseInformation houseInformation){
+        try {
+            List<HouseInformation> houseInformations = preValidateHouseDao.getValidateHouseList(houseInformation);
+            return houseInformations;
+        }catch (Exception e){
+            logger.error("get validate House error ",e);
+        }
+        return null;
+    }
+
+    /**
+     * 核验机房主体增改删业务
+     * @param houseInformation
+     * @return
+     */
+	@Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+	@Override
+	public DealFlagConstant.StatusEnum handHouseInfo(HouseInformation houseInformation) {
+		DealFlagConstant.StatusEnum resultStatus = DealFlagConstant.StatusEnum.WAITING;
+		if (houseInformation == null) {
+			resultStatus = DealFlagConstant.StatusEnum.WAITING;
+		}
+		int houseNum;
+		HouseInformation house = new HouseInformation();
+		switch (houseInformation.getOperateType()) {
+		// 新增
+		case 1:
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] newly validate starting......");
+			house.setHouseIdStr(houseInformation.getHouseIdStr());
+			house.setHouseName(houseInformation.getHouseName());
+			houseNum = preValidateHouseDao.houseNum(house);
+			if (houseNum > 0) {
+				// 正式表存在该机房 核验失败 写数据库
+				houseInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" 上报表存在机房[" + houseInformation.getHouseName() + "]信息，新增上报失败");
+				handleFaileHouse(houseInformation);
+				resultStatus = DealFlagConstant.StatusEnum.FAIL;
+			} else {
+				resultStatus = DealFlagConstant.StatusEnum.SUCCESS;
+			}
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] newly validate end, status is [" + resultStatus + "]......");
+			return resultStatus;
+		case 2:
+			// 修改
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] update validate starting......");
+			house.setHouseId(houseInformation.getHouseId());
+			houseNum = preValidateHouseDao.houseNum(house);
+			if (houseNum != 1) {
+				// 正式表不存在该机房 核验失败 写数据库
+				houseInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" 上报表不存在机房[" + houseInformation.getHouseName() + "]信息，变更上报失败");
+				handleFaileHouse(houseInformation);
+				resultStatus = DealFlagConstant.StatusEnum.FAIL;
+			} else {
+				resultStatus = DealFlagConstant.StatusEnum.SUCCESS;
+			}
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] update validate end, status is [" + resultStatus + "]......");
+			return resultStatus;
+		case 3:
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] delete validate starting......");
+			house.setHouseId(houseInformation.getHouseId());
+			houseNum = preValidateHouseDao.houseNum(house);
+			if (houseNum != 1) {
+				// 正式表不存在该机房 核验失败 写数据库
+				houseInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" [机房名称:" + houseInformation.getHouseName() + "]未找到上报信息，删除失败");
+				handleFaileHouse(houseInformation);
+				resultStatus = DealFlagConstant.StatusEnum.FAIL;
+			} else {
+				resultStatus = DealFlagConstant.StatusEnum.SUCCESS;
+			}
+			logger.info("[DataValidate]The house name [" + houseInformation.getHouseName() + "] delete validate end, status is [" + resultStatus + "]......");
+			return resultStatus;
+		}
+		return resultStatus;
+	}
+
+	/**
+	 * 处理核验不过的
+	 * @param houseInformation
+	 */
+	private void handleFaileHouse(HouseInformation houseInformation){
+		houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+		preValidateHouseDao.submitHouse(houseInformation);
+		WriteApproveProcess.getInstance().write(houseInformation);
+		logger.info("update house statues and write process ");
+	}
+
+}

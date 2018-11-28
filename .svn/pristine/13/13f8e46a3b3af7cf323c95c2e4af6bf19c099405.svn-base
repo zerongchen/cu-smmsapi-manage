@@ -1,0 +1,303 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.aotain.cu.serviceapi.model.HouseInformation;
+import com.aotain.cu.serviceapi.model.HouseUserFrameInformation;
+import com.aotain.cu.serviceapi.model.IdcInformation;
+import com.aotain.cu.serviceapi.model.UserInformation;
+import com.aotain.cu.utils.ThreadLocalUtil;
+import com.aotain.smmsapi.task.constant.DealFlagConstant;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateHouseDao;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateHouse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class PreValidateHouseImpl implements PreValidateHouse {
+
+    private static Logger logger = LoggerFactory.getLogger(PreValidateHouseImpl.class);
+
+    @Autowired
+    private PreValidateHouseDao preValidateHouseDao;
+
+    @Autowired
+    private PreValidateUserImpl preValidateUser;
+
+//    private static List<UserInformation> userInformationList;
+
+    private IdcInformation idcInformation;
+
+    private static long houseSuccessCnt;
+    private static long houseTotalCnt;
+
+    private static long userSuccessCnt;
+    private static long userFailCnt;
+
+    private static List<UserInformation> verifiedUsers=new ArrayList<UserInformation>();
+    private List<HouseInformation> houseBatchConstructs =new ArrayList<HouseInformation>();
+    private List<UserInformation> userBatchConstructs =new ArrayList<UserInformation>();
+
+    public IdcInformation getIdcInformation() {
+        return idcInformation;
+    }
+
+    public void setIdcInformation( IdcInformation idcInformation ) {
+        this.idcInformation = idcInformation;
+    }
+
+    public List<HouseInformation> getHouseBatchConstructs() {
+        return houseBatchConstructs;
+    }
+
+    @Override
+    public void handleValidateHouse() {
+        try {
+            //初始化
+//            userInformationList = getNeedUser();
+            verifiedUsers.clear();
+            houseBatchConstructs.clear();
+            userBatchConstructs.clear();
+            houseSuccessCnt=0;
+            houseTotalCnt = 0;
+            userSuccessCnt = 0;
+            userFailCnt = 0;
+
+            HouseInformation param =  new HouseInformation();
+            param.setDealFlag(DealFlagConstant.RPT_VARIFY.getDealFlag());
+            if (getIdcInformation()!=null) param.setJyzId(getIdcInformation().getJyzId());
+            //获取相关经营者下面的上报审核中的机房
+            List<HouseInformation> houseInformations = getValidateObj(param);
+            //上报审核中的机房总数量
+            houseTotalCnt=houseInformations.size();
+
+            if(houseInformations!=null && !houseInformations.isEmpty()){
+                for (HouseInformation houseInformation:houseInformations){
+                    //如果机房核验(handHouseInfo)通过，核验成功次数+1
+                    if (handHouseInfo(houseInformation)==DealFlagConstant.StatusEnum.SUCCESS){
+                        houseSuccessCnt++;
+                    }
+                }
+            }
+            ThreadLocalUtil.set("houseSuccessCnt",houseSuccessCnt);
+            ThreadLocalUtil.set("houseTotalCnt",houseTotalCnt);
+            ThreadLocalUtil.set("userSuccessCnt",userSuccessCnt);
+            ThreadLocalUtil.set("userFailCnt",userFailCnt);
+            preValidateUser.setAreadyVerifyByHouse(verifiedUsers);
+            preValidateUser.setUserBatchConstructs(userBatchConstructs);
+            //核验用户
+            preValidateUser.handleValidateUser();
+        }catch (Exception e){
+            logger.error("handle validate House error ",e);
+        }
+    }
+    /**
+     * 获取需要核验的对象
+     * @param houseInformation
+     * @return
+     */
+    public List<HouseInformation> getValidateObj( HouseInformation houseInformation){
+        try {
+            List<HouseInformation> houseInformations = preValidateHouseDao.getValidateHouseList(houseInformation);
+            return houseInformations;
+        }catch (Exception e){
+            logger.error("get validate House error ",e);
+        }
+        return null;
+    }
+
+    /**
+     * 核验机房主体增改删业务
+     * @param houseInformation
+     * @return
+     */
+    @Transactional(propagation = Propagation.REQUIRED,rollbackFor = Exception.class)
+    @Override
+    public DealFlagConstant.StatusEnum handHouseInfo( HouseInformation houseInformation){
+        if (houseInformation==null) return DealFlagConstant.StatusEnum.WAITING;
+        int houseNum;
+        HouseInformation house = new HouseInformation();
+        List<UserInformation> waitingUser;
+        switch (houseInformation.getOperateType()){
+            //新增
+            case 1:
+                house.setHouseIdStr(houseInformation.getHouseIdStr());
+                house.setHouseName(houseInformation.getHouseName());
+                houseNum = preValidateHouseDao.houseNum(house);
+                if(houseNum>0){
+                    //正式表存在该机房 核验失败 写数据库
+                    houseInformation.setVerificationResult("正式表存在该机房,新增失败");
+                    return DealFlagConstant.StatusEnum.FAIL;
+                }else {
+                    //获取用户信息
+                    List<UserInformation> users = preValidateHouseDao.getPreUsers(houseInformation);
+//                    List<UserInformation> users = getUsersByHouseInfo(houseInformation);
+                    if (users==null || users.isEmpty()){
+//                        writeHouseSuccessLog(houseInformation);
+                        houseBatchConstructs.add(houseInformation);
+                        return DealFlagConstant.StatusEnum.SUCCESS;
+                    }else {
+                        List<UserInformation> onVerifyUser=new ArrayList<UserInformation>();
+                        waitingUser=new ArrayList<UserInformation>();
+                        for (UserInformation userInformation:users){
+                            //0 1 3 6 未预审或者失败的
+                            if(userInformation.getDealFlag().intValue()==DealFlagConstant.UN_PRE_VARIFY.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()==DealFlagConstant.PRE_VARIFY_FAIL.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()==DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()==DealFlagConstant.UN_PRE_VARIFY.getDealFlag()){
+                                waitingUser.add(userInformation);
+                            }else if (userInformation.getDealFlag().intValue()==DealFlagConstant.RPT_VARIFY.getDealFlag()){
+                                onVerifyUser.add(userInformation);
+                            }
+                        }
+                        return handleHouseAndUsers(houseInformation,onVerifyUser,waitingUser);
+                    }
+                }
+            case 2:
+                //修改
+                house.setHouseId(houseInformation.getHouseId());
+                houseNum = preValidateHouseDao.houseNum(house);
+                if(houseNum!=1){
+                    //正式表不存在该机房 核验失败 写数据库
+                    houseInformation.setVerificationResult("正式表不存在该机房,修改失败");
+                    houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+                    preValidateHouseDao.submitHouse(houseInformation);
+                    return DealFlagConstant.StatusEnum.FAIL;
+                }else {
+                    //正式表存在该机房 ,identity==1？提取机房IP地址的所属客户信息:提取机房IP地址的所属客户信息+提取机房机架的所属客户信息
+                    List<UserInformation> preUsers=null;
+                    waitingUser=new ArrayList<UserInformation>();
+                    if (houseInformation.getIdentity()!=1){
+//                      提取机房IP地址的所属客户信息+提取机房机架的所属客户信息
+                        preUsers = preValidateHouseDao.getPreUsers(houseInformation);
+                    }else {
+                        //提取机房IP地址的所属客户信息
+                        houseInformation.setUserFrameList(new ArrayList<HouseUserFrameInformation>());
+                        preUsers = preValidateHouseDao.getPreUsers(houseInformation);
+                    }
+
+                    List<UserInformation> onverifyUser = new ArrayList<UserInformation>();
+                    /**
+                     * 此处代码默认是逻辑删除，新增，修改，删除直接看子类的czlx
+                     */
+                    if (!preUsers.isEmpty()){
+                        for (UserInformation userInformation:preUsers){
+                            if(!(userInformation.getDealFlag().intValue()==DealFlagConstant.RPT_FAIL.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()!=DealFlagConstant.RPT_VARIFY.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()!=DealFlagConstant.SUB_RPT.getDealFlag()
+                            )){
+                                //如存在状态不是上报成功或者上报审核中的记录,等待
+                                waitingUser.add(userInformation);
+                            }else if(userInformation.getDealFlag().intValue()==DealFlagConstant.RPT_FAIL.getDealFlag()){
+                                onverifyUser.add(userInformation);
+                            }
+                        }
+                    }
+                    return handleHouseAndUsers(houseInformation,onverifyUser,waitingUser);
+                }
+            case 3:
+                house.setHouseId(houseInformation.getHouseId());
+                houseNum = preValidateHouseDao.houseNum(house);
+                if(houseNum!=1){
+                    //正式表不存在该机房 核验失败 写数据库
+                    houseInformation.setVerificationResult("正式表不存在该机房，删除失败");
+                    houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+                    preValidateHouseDao.submitHouse(houseInformation);
+                    return DealFlagConstant.StatusEnum.FAIL;
+                }
+//                提取机房IP地址的所属客户信息+提取机房机架的所属客户信息
+                List<UserInformation> preUsers = preValidateHouseDao.getPreUsers(houseInformation);
+                waitingUser=new ArrayList<UserInformation>();
+                List<UserInformation> onverifyUser = new ArrayList<UserInformation>();
+                //机房下面的用户不为空的时候,核验所有用户是否提交上报或者上报成功的
+                if (preUsers!=null && !preUsers.isEmpty()){
+                    for (UserInformation userInformation:preUsers){
+                        //非上报审核中 或者非上报成功的
+                        if (!(userInformation.getDealFlag().intValue()==DealFlagConstant.RPT_VARIFY.getDealFlag()
+                                || userInformation.getDealFlag().intValue()==DealFlagConstant.RPT_SUCCESS.getDealFlag()
+                                || userInformation.getDealFlag().intValue()!=DealFlagConstant.SUB_RPT.getDealFlag())){
+                            //核验不成功，等待
+                            waitingUser.add(userInformation);
+                        }else if (userInformation.getDealFlag().intValue()!=DealFlagConstant.RPT_VARIFY.getDealFlag()){
+                            onverifyUser.add(userInformation);
+                        }
+                    }
+                    return handleHouseAndUsers(houseInformation,onverifyUser,waitingUser);
+                }else {
+                    houseBatchConstructs.add(houseInformation);
+                    return DealFlagConstant.StatusEnum.SUCCESS;
+//                    return writeHouseSuccessLog(houseInformation);
+                }
+        }
+        return DealFlagConstant.StatusEnum.WAITING;
+    }
+
+    /**
+     * 对上报审核中的用户进行核验（且没有失败的），全部通过则写机房主体和用户主体等待表，记录表，kafka，否则提示机房下面失败，未预审的用户
+     * @param houseInformation
+     * @param onverifyUser
+     * @param unVerifyUser
+     * @return
+     */
+    public DealFlagConstant.StatusEnum handleHouseAndUsers(HouseInformation houseInformation,List<UserInformation> onverifyUser,List<UserInformation> unVerifyUser){
+        List<UserInformation> verifyUser =new ArrayList<>();
+        if (!onverifyUser.isEmpty()) {
+            for (UserInformation userInformation : onverifyUser) {
+                //调用户核验,核验通过，对用户核验对象里面的成功次数+1
+                List<UserInformation> reallyObj = preValidateUser.getValidateObj(userInformation);
+                if (reallyObj!=null && !reallyObj.isEmpty()) {
+                    UserInformation reallyUsers = reallyObj.get(0);
+                    if (preValidateUser.handUserInfo(reallyUsers) == DealFlagConstant.StatusEnum.SUCCESS) {
+                        verifyUser.add(reallyUsers);
+                        userSuccessCnt++;
+                    } else {
+                        //核验不通过的直接 追加到unVerifyUser中
+                        userInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+                        unVerifyUser.add(reallyUsers);
+                        userFailCnt++;
+                    }
+                }
+            }
+        }
+        //如果核验不通过的（unVerifyUser）是空的,说明该机房下面的所有用户（以及用户所对应的机房）是核验通过的
+        //则写机房的记录表，等待表，kafka(writeHouseSuccessLog) ,所有用户也写记录表，等待表，kafka(preValidateUser.writeUserSuccessLog)
+        if (unVerifyUser.isEmpty()){
+            houseBatchConstructs.add(houseInformation);
+            userBatchConstructs.addAll(verifyUser);
+            verifiedUsers.addAll(verifyUser);
+//            writeHouseSuccessLog(houseInformation);
+//            if (!verifyUser.isEmpty()){
+//                for (UserInformation userInformation:verifyUser){
+//                    //调用户写等待上报表，记录表，kafka
+//                    preValidateUser.writeUserSuccessLog(userInformation);
+//                }
+//            }
+            return DealFlagConstant.StatusEnum.SUCCESS;
+        }else {
+            //如果尚有核验不通过，或者本身失败，未预审的用户,更新机房主体提示信息，
+            //但是已经核验过的用户，在接下来的用户核验中直接略过
+//            preValidateUser.addverifyByHouse(verifyUser);
+            verifiedUsers.addAll(verifyUser);
+
+            StringBuilder sb = new StringBuilder();
+            for (UserInformation userInformation:unVerifyUser){
+                sb.append(""+userInformation.getUnitName()+" "+DealFlagConstant.getDealDesc(userInformation.getDealFlag())).append("\r\n");
+            }
+            HouseInformation param  =  new HouseInformation();
+            param.setHouseId(houseInformation.getHouseId());
+            param.setVerificationResult(sb.toString());
+            preValidateHouseDao.submitHouse(param);
+
+
+            return DealFlagConstant.StatusEnum.WAITING;
+        }
+    }
+
+
+
+}

@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.prevalidate.mapper.PreValidateHouseDao">
+  <resultMap id="HouseBaseResultMap" type="com.aotain.cu.serviceapi.model.HouseInformation">
+    <id column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="HOUSEIDSTR" jdbcType="VARCHAR" property="houseIdStr" />
+    <result column="HOUSENAME" jdbcType="VARCHAR" property="houseName" />
+    <result column="HOUSETYPE" jdbcType="INTEGER" property="houseType" />
+    <result column="HOUSEPROVINCE" jdbcType="INTEGER" property="houseProvince" />
+    <result column="HOUSECITY" jdbcType="INTEGER" property="houseCity" />
+    <result column="HOUSECOUNTY" jdbcType="INTEGER" property="houseCounty" />
+    <result column="HOUSEADD" jdbcType="VARCHAR" property="houseAddress" />
+    <result column="HOUSEZIP" jdbcType="VARCHAR" property="houseZipCode" />
+    <result column="HO_NAME" jdbcType="VARCHAR" property="houseOfficerName" />
+    <result column="HO_IDTYPE" jdbcType="INTEGER" property="houseOfficerIdType" />
+    <result column="HO_ID" jdbcType="VARCHAR" property="houseOfficerId" />
+    <result column="HO_TEL" jdbcType="VARCHAR" property="houseOfficerTelephone" />
+    <result column="HO_MOBILE" jdbcType="VARCHAR" property="houseOfficerMobile" />
+    <result column="HO_EMAIL" jdbcType="VARCHAR" property="houseOfficerEmail" />
+    <result column="CZLX" jdbcType="INTEGER" property="operateType" />
+    <result column="DEAL_FLAG" jdbcType="INTEGER" property="dealFlag" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="INFO_COMPLETE" jdbcType="VARCHAR" property="infoComplete" />
+    <result column="IDENTIFY" jdbcType="DECIMAL" property="identity" />
+    <collection property="ipSegList" ofType="com.aotain.cu.serviceapi.model.HouseIPSegmentInformation" column="HOUSEID" select="getIpSegList"></collection>
+    <collection property="userFrameList" ofType="com.aotain.cu.serviceapi.model.HouseUserFrameInformation" column="HOUSEID" select="getFrameList"></collection>
+  </resultMap>
+  
+  <sql id="house_field">
+    HOUSEID,JYZID,HOUSEIDSTR,HOUSENAME,HOUSETYPE,HOUSEPROVINCE,HOUSECITY,HOUSECOUNTY
+    ,HOUSEADD,HOUSEZIP,HO_NAME,HO_IDTYPE,HO_ID,HO_TEL,HO_MOBILE,HO_EMAIL,
+    CZLX,DEAL_FLAG,CREATE_TIME,UPDATE_TIME,CREATE_USERID,UPDATE_USERID,INFO_COMPLETE,IDENTIFY
+  </sql>
+
+  <select id="getValidateHouseList" resultMap="HouseBaseResultMap" parameterType="com.aotain.cu.serviceapi.model.HouseInformation">
+    select <include refid="house_field" /> from IDC_ISMS_BASE_HOUSE
+    WHERE 1=1
+    <choose>
+      <when test="dealFlag!=null">
+        AND DEAL_FLAG=#{dealFlag}
+      </when>
+      <otherwise>
+        AND DEAL_FLAG=2
+      </otherwise>
+    </choose>
+  </select>
+  
+  <select id="getIpSegList" parameterType="java.lang.Integer" resultType="com.aotain.cu.serviceapi.model.HouseIPSegmentInformation">
+    SELECT
+    IPSEGID AS ipSegId,
+    USERNAME as userName,
+    IDTYPE as idType,
+    IDNUMBER AS idNumber,
+    DEAL_FLAG AS dealFlag,
+    CZLX AS operateType
+    FROM IDC_ISMS_BASE_HOUSE_IPSEG
+    WHERE HOUSEID = #{houseId}
+  </select>
+  
+  <select id="getFrameList" parameterType="java.lang.Integer" resultType="com.aotain.cu.serviceapi.model.HouseUserFrameInformation">
+   SELECT
+   ID AS id,
+   UNITNAME as userName,
+   IDTYPE AS idType,
+   IDNUMBER AS idNumber
+   FROM IDC_ISMS_BASE_USER_FRAME
+   WHERE HOUSEID = #{houseId}
+  </select>
+  
+  <select id="houseNum" resultType="java.lang.Integer" parameterType="com.aotain.cu.serviceapi.model.HouseInformation">
+    SELECT count(1) from RPT_ISMS_BASE_HOUSE t
+    WHERE 1=1
+    <if test="houseId!=null">
+      AND HOUSEID=#{houseId}
+    </if>
+    <if test="jyzId!=null">
+      AND JYZID=#{jyzId}
+    </if>
+  </select>
+  
+  <update id="submitHouse" parameterType="com.aotain.cu.serviceapi.model.HouseInformation">
+    UPDATE IDC_ISMS_BASE_HOUSE
+    <set>
+      <if test="dealFlag!=null">
+        DEAL_FLAG=#{dealFlag},
+      </if>
+      <if test="verificationResult!=null">
+        ABNORMAL_INFORMATION=#{verificationResult}
+      </if>
+    </set>
+    WHERE HOUSEID=#{houseId}
+    and DEAL_FLAG!=0
+  </update>
+  
+  <select id="getPreUsers" resultType="com.aotain.cu.serviceapi.model.UserInformation" parameterType="com.aotain.cu.serviceapi.model.HouseInformation">
+    <choose>
+    <when test="ipSegList!=null and ipSegList.size()>0">
+      SELECT
+      USERID as userId,
+      UNITNAME as unitName,
+      IDTYPE as idType,
+      IDNUMBER AS idNumber,
+      DEAL_FLAG as dealFlag
+      FROM IDC_ISMS_BASE_USER
+      WHERE 1=1 AND (
+      <foreach collection="ipSegList" item="item" separator="OR">
+        
+        <if test="item.userName!=null">
+          ( UNITNAME = #{item.userName}
+          <if test="item.idType!=null">
+            AND IDTYPE=#{item.idType}
+          </if>
+          <if test="item.idNumber!=null">
+            AND IDNUMBER=#{item.idNumber}
+          </if>
+          )
+        </if>
+      </foreach>
+      )
+    </when>
+      <otherwise>
+        select null as userId ,NULL AS unitName ,NULL AS dealFlag FROM dual where rownum=0;
+      </otherwise>
+    </choose>
+    <if test="userFrameList!=null and userFrameList.size()>0">
+      UNION ALL
+      SELECT
+      USERID as userId,
+      UNITNAME as unitName,
+      IDTYPE as idType,
+      IDNUMBER AS idNumber,
+      DEAL_FLAG as dealFlag
+      FROM IDC_ISMS_BASE_USER
+      WHERE 1=1 AND (
+      <foreach collection="userFrameList" item="item" separator="OR">
+        <if test="item.userName!=null">
+          ( UNITNAME = #{item.userName}
+          <if test="item.idType!=null">
+            AND IDTYPE=#{item.idType}
+          </if>
+          <if test="item.idNumber!=null">
+            AND IDNUMBER=#{item.idNumber}
+          </if>
+          )
+        </if>
+      </foreach>
+      )
+    </if>
+  </select>
+  
+  <resultMap id="RptHouseBaseResultMap" type="com.aotain.cu.serviceapi.model.HouseInformation">
+    <id column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="HOUSEIDSTR" jdbcType="VARCHAR" property="houseIdStr" />
+    <result column="HOUSENAME" jdbcType="VARCHAR" property="houseName" />
+    <result column="HOUSETYPE" jdbcType="INTEGER" property="houseType" />
+    <result column="HOUSEPROVINCE" jdbcType="INTEGER" property="houseProvince" />
+    <result column="HOUSECITY" jdbcType="INTEGER" property="houseCity" />
+    <result column="HOUSECOUNTY" jdbcType="INTEGER" property="houseCounty" />
+    <result column="HOUSEADD" jdbcType="VARCHAR" property="houseAddress" />
+    <result column="HOUSEZIP" jdbcType="VARCHAR" property="houseZipCode" />
+    <result column="HO_NAME" jdbcType="VARCHAR" property="houseOfficerName" />
+    <result column="HO_IDTYPE" jdbcType="INTEGER" property="houseOfficerIdType" />
+    <result column="HO_ID" jdbcType="VARCHAR" property="houseOfficerId" />
+    <result column="HO_TEL" jdbcType="VARCHAR" property="houseOfficerTelephone" />
+    <result column="HO_MOBILE" jdbcType="VARCHAR" property="houseOfficerMobile" />
+    <result column="HO_EMAIL" jdbcType="VARCHAR" property="houseOfficerEmail" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="IDENTIFY" jdbcType="DECIMAL" property="identity" />
+    <collection property="ipSegList" ofType="com.aotain.cu.serviceapi.model.HouseIPSegmentInformation" column="HOUSEID" select="getRptIpSegList"></collection>
+    <collection property="userFrameList" ofType="com.aotain.cu.serviceapi.model.HouseUserFrameInformation" column="HOUSEID" select="getRptFrameList"></collection>
+  </resultMap>
+  
+  
+  <select id="getRptHouse" parameterType="com.aotain.cu.serviceapi.model.HouseInformation" resultMap="RptHouseBaseResultMap">
+    SELECT
+    HOUSEID,JYZID,HOUSEIDSTR,HOUSENAME,HOUSETYPE,HOUSEPROVINCE,HOUSECITY,HOUSECOUNTY
+    ,HOUSEADD,HOUSEZIP,HO_NAME,HO_IDTYPE,HO_ID,HO_TEL,HO_MOBILE,HO_EMAIL,
+    CREATE_TIME,UPDATE_TIME,CREATE_USERID,UPDATE_USERID,IDENTIFY
+    FROM RPT_ISMS_BASE_HOUSE
+    WHERE HOUSEID=#{houseId} AND JYZID=#{jyzId}
+  </select>
+  <select id="getRptIpSegList" parameterType="java.lang.Integer" resultType="com.aotain.cu.serviceapi.model.HouseIPSegmentInformation">
+    SELECT
+    IPSEGID AS ipSegId,
+    USERNAME as userName,
+    IDTYPE as idType,
+    IDNUMBER AS idNumber
+    FROM RPT_ISMS_BASE_HOUSE_IPSEG
+    WHERE HOUSEID = #{houseId}
+  </select>
+  
+  <select id="getRptFrameList" parameterType="java.lang.Integer" resultType="com.aotain.cu.serviceapi.model.HouseUserFrameInformation">
+    SELECT
+    USERNAME as userName
+    IDTYPE AS idType,
+    IDNUMBER AS idNumber
+    FROM RPT_ISMS_BASE_HOUSE_USERFRAME
+    WHERE HOUSEID = #{houseId}
+  </select>
+  
+  <select id="getRptUsers" resultType="com.aotain.cu.serviceapi.model.UserInformation" parameterType="com.aotain.cu.serviceapi.model.HouseInformation">
+    <choose>
+      <when test="ipSegList!=null and ipSegList.size()>0">
+        SELECT
+        USERID as userId,
+        UNITNAME as unitName,
+        IDTYPE as idType,
+        IDNUMBER as idNumber
+        FROM RPT_ISMS_BASE_USER
+        WHERE 1=1 AND (
+        <foreach collection="ipSegList" item="item" separator="OR">
+          
+          <if test="item.userName!=null">
+            ( UNITNAME = #{item.userName}
+            <if test="item.idType!=null">
+              AND IDTYPE=#{item.idType}
+            </if>
+            <if test="item.idNumber!=null">
+              AND IDNUMBER=#{item.idNumber}
+            </if>
+            )
+          </if>
+        </foreach>
+        )
+      </when>
+      <otherwise>
+        select null as userId ,NULL AS unitName ,NULL AS idType ,null as idNumber FROM dual where rownum=0;
+      </otherwise>
+    </choose>
+    <if test="userFrameList!=null and userFrameList.size()>0">
+      UNION ALL
+      SELECT
+      USERID as userId,
+      UNITNAME as unitName,
+      IDTYPE as idType,
+      IDNUMBER as idNumber
+      FROM RPT_ISMS_BASE_USER
+      WHERE 1=1 AND (
+      <foreach collection="userFrameList" item="item" separator="OR">
+        <if test="item.userName!=null">
+          ( UNITNAME = #{item.userName}
+          <if test="item.idType!=null">
+            AND IDTYPE=#{item.idType}
+          </if>
+          <if test="item.idNumber!=null">
+            AND IDNUMBER=#{item.idNumber}
+          </if>
+          )
+        </if>
+      </foreach>
+      )
+    </if>
+  </select>
+  
+  <select id="getPreUsersByRptUser" resultMap="com.aotain.cu.serviceapi.model.UserInformation" parameterType="java.util.List">
+    SELECT
+      USERID as userId,
+      UNITNAME as unitName,
+      IDTYPE as idType,
+      IDNUMBER as idNumber,
+      DEAL_FLAG AS dealFlag,
+      CZLX as operateType,
+      FROM IDC_ISMS_BASE_USER
+      WHERE USERID IN (
+        <foreach collection="list" item="item" separator=",">
+          #{item.userId}
+        </foreach>
+      )
+  </select>
+
+</mapper>

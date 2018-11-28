@@ -1,0 +1,106 @@
+package com.aotain.smmsapi.task.prevalidate.mapper;
+
+import java.util.List;
+
+import com.aotain.common.config.annotation.MyBatisDao;
+import com.aotain.cu.serviceapi.model.HouseInformation;
+import com.aotain.cu.serviceapi.model.ServiceDomainInformation;
+import com.aotain.cu.serviceapi.model.UserBandwidthInformation;
+import com.aotain.cu.serviceapi.model.UserInformation;
+import com.aotain.cu.serviceapi.model.UserServiceInformation;
+import com.aotain.cu.serviceapi.model.UserVirtualInformation;
+
+@MyBatisDao
+public interface PreValidateUserDao {
+
+	/**
+	 * 获取用户主体信息
+	 * @param userInformation
+	 * @return
+	 */
+	List<UserInformation> getValidateUserList( UserInformation userInformation );
+
+	/**
+	 * 根据userInformation 的带宽信息的hourseId 获取操作表中的机房信息
+	 * @param userInformation
+	 * @return
+	 */
+	List<HouseInformation> getPreHouse(UserInformation userInformation);
+
+	/**
+	 * 根据操作表中用户的信息获取正式表中用户的信息
+	 * @param userInformation
+	 * @return
+	 */
+	UserInformation getRptUser(UserInformation userInformation);
+
+	/**
+	 * 根据userInformation 的带宽信息的hourseId 获取操作表中的机房信息
+	 * @param userInformation
+	 * @return
+	 */
+	List<HouseInformation> getRptHouse(UserInformation userInformation);
+
+	/**
+	 * 正式表用户主体数量
+	 * @param userInformation
+	 * @return
+	 */
+	int userNum(UserInformation userInformation);
+
+	/**
+	 * 更新用户主体
+	 * @param userInformation
+	 * @return
+	 */
+	int submitUser( UserInformation userInformation );
+
+	/**
+	 * 更新用户带宽
+	 * @param userBandwidthInformation
+	 * @return
+	 */
+	int submitUserBand( UserBandwidthInformation userBandwidthInformation );
+
+	/**
+	 * 更新用户虚拟主机
+	 * @param userVirtualInformation
+	 * @return
+	 */
+	int submitUserVirtual( UserVirtualInformation userVirtualInformation );
+
+	/**
+	 * 更新用户服务
+	 * @param userServiceInformation
+	 * @return
+	 */
+	int submitUserService( UserServiceInformation userServiceInformation );
+
+	/**
+	 * 更新用户服务域名
+	 * @param serviceDomainInformation
+	 * @return
+	 */
+	int submitUserServiceDomain( ServiceDomainInformation serviceDomainInformation );
+
+	/**
+	 * 获取操作表的机房信息
+	 * @return
+	 */
+	List<HouseInformation> getPreHouseByRptHouse(List<HouseInformation> lists);
+
+
+	/**
+	 * 写等待表基础
+	 */
+	void writeUserLog(UserInformation userInformation);
+	void writeUserBandLog( UserBandwidthInformation userBandwidthInformation);
+	void writeUserServiceLog( UserServiceInformation userServiceInformation);
+	void writeUserServiceDomainLog(ServiceDomainInformation serviceDomainInformation);
+	void writeUserVirtualLog(UserVirtualInformation userVirtualInformation);
+
+	int integrityVerificationForUserBandwidth(long userId, long houseId);
+	int integrityVerificationForUserIp(UserInformation userInformation);
+	int integrityVerificationForUserFrames(UserInformation userInformation);
+	
+}

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.smmsreturn.mapper.SubmitReportFileDao">
+	<resultMap type="com.aotain.smmsapi.task.bean.IsmsWaitSubmitReportFile" id="reportFileMap">
+		<id column="REPORT_FILENAME" jdbcType="VARCHAR" property="reportFileName" />
+	    <result column="SUBMIT_ID" jdbcType="DECIMAL" property="submitId" />
+	    <result column="REPORT_TYPE" jdbcType="DECIMAL" property="reportType" />
+	    <result column="DEAL_FLAG" jdbcType="DECIMAL" property="dealFlag" />
+	    <result column="JYZ_ID" jdbcType="VARCHAR" property="jyzId" />
+	    <result column="HOUSE_ID" jdbcType="VARCHAR" property="houseId" />
+	    <result column="USER_ID" jdbcType="VARCHAR" property="userId" />
+	</resultMap>
+
+	<select id="getReportFileInfo" resultMap="reportFileMap">
+		SELECT * FROM WAIT_ISMS_SUBMIT_REPORTFILE WHERE 1=0
+		<if test="fileName!=null and fileName!=''">
+			OR (report_filename=#{fileName})
+		</if>
+	</select>
+	
+	<update id="updateDealFlag">
+		UPDATE WAIT_ISMS_SUBMIT_REPORTFILE SET DEAL_FLAG=#{dealFlag} WHERE REPORT_FILENAME=#{fileName}
+	</update>
+
+	<select id="countSubmitFile" resultType="java.lang.Integer">
+		SELECT count(1) FROM WAIT_ISMS_SUBMIT_REPORTFILE WHERE 1=1
+		<if test="submitId!=null">
+			and (SUBMIT_ID=#{submitId})
+		</if>
+		<if test="dealFlag!=null and dealFlag >= 0">
+			and (DEAL_FLAG=#{dealFlag})
+		</if>
+	</select>
+	
+	<update id="updateSubmitLogStatus">
+		UPDATE WAIT_ISMS_SUBMIT_REPORTLOG SET DEAL_FLAG=#{dealFlag} WHERE SUBMIT_ID=#{submitId}
+	</update>
+</mapper>

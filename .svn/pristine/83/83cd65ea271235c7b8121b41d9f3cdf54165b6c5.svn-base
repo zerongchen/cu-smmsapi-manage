@@ -1,0 +1,12 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateUser;
+
+public class PreValidateUserImpl implements PreValidateUser {
+
+
+    @Override
+    public void handleValidateUser() {
+
+    }
+}

@@ -1,0 +1,9 @@
+package com.aotain.smmsapi.task;
+
+import org.apache.curator.utils.PathUtils;
+
+public class Test {
+	public static void main(String[] args) {
+		PathUtils.validatePath("asdfasfd");
+	}
+}

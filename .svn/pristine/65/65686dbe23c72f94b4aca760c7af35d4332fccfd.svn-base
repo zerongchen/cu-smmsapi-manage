@@ -1,0 +1,22 @@
+package com.aotain.smmsapi.task.smmsreturn.mapper;
+
+import java.util.List;
+
+import org.apache.ibatis.annotations.Param;
+
+import com.aotain.common.config.annotation.MyBatisDao;
+
+/**
+ * 基础数据操作表数据库操作接口
+ * 
+ * @author liuz@aotian.com
+ * @date 2018年8月16日 下午2:36:46
+ */
+@MyBatisDao
+public interface OperatorTablesDao {
+	public int deleteJyz(@Param("jyzId")Long jyzId);
+
+	public int deleteHouses(@Param("houseIdList")List<Integer> houseIdList);
+
+	public int deleteUsers(@Param("userIdList")List<Long> userIdList);
+}

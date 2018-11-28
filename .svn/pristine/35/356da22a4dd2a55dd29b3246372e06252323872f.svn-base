@@ -1,0 +1,69 @@
+package com.aotain.smmsapi.task.prevalidate.mapper;
+
+import com.aotain.common.config.annotation.MyBatisDao;
+import com.aotain.cu.serviceapi.model.*;
+
+import java.util.List;
+
+@MyBatisDao
+public interface PreValidateUserDao {
+
+	/**
+	 * 获取用户主体信息
+	 * @param userInformation
+	 * @return
+	 */
+	List<UserInformation> getValidateUserList( UserInformation userInformation );
+
+	/**
+	 * 根据userInformation 的带宽信息的hourseId 获取操作表中的机房信息
+	 * @param userInformation
+	 * @return
+	 */
+	List<HouseInformation> getPreHouse(UserInformation userInformation);
+
+	/**
+	 * 根据操作表中用户的信息获取正式表中用户的信息
+	 * @param userInformation
+	 * @return
+	 */
+	UserInformation getRptUser(UserInformation userInformation);
+
+	/**
+	 * 根据userInformation 的带宽信息的hourseId 获取操作表中的机房信息
+	 * @param userInformation
+	 * @return
+	 */
+	List<HouseInformation> getRptHouse(UserInformation userInformation);
+
+	/**
+	 * 正式表用户主体数量
+	 * @param userInformation
+	 * @return
+	 */
+	int userNum(UserInformation userInformation);
+
+	/**
+	 * 更新用户主体
+	 * @param userInformation
+	 * @return
+	 */
+	int submitUser( UserInformation userInformation );
+
+	/**
+	 * 获取操作表的机房信息
+	 * @return
+	 */
+	List<HouseInformation> getPreHouseByRptHouse(List<HouseInformation> lists);
+
+
+	/**
+	 * 写等待表基础
+	 */
+	void writeUserLog(UserInformation userInformation);
+	void writeUserBandLog( UserBandwidthInformation userBandwidthInformation);
+	void writeUserServiceLog( UserServiceInformation userServiceInformation);
+	void writeUserServiceDomainLog(ServiceDomainInformation serviceDomainInformation);
+	void writeUserVirtualLog(UserVirtualInformation userVirtualInformation);
+
+}

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.aotain.smmsapi.task.logStatus.mapper.LogReportDao">
+
+	<resultMap id="commaneMessageMap" type="com.aotain.common.utils.model.msg.CommandMessage">
+        <result column="STAT_ID" jdbcType="DECIMAL" property="statId" />
+        <result column="TASKID" jdbcType="DECIMAL" property="toptaskid" />
+        <result column="HOUSEIDSTR" jdbcType="VARCHAR" property="houseidstr" />
+        <result column="COMMAND_TYPE" jdbcType="INTEGER" property="command_type" />
+        <result column="POLICY_TYPE" jdbcType="INTEGER" property="policy_type" />
+        <result column="DATA_TYPE" jdbcType="INTEGER" property="data_type" />
+        <result column="STATISTIME" jdbcType="DECIMAL" property="statis_time" />
+        <result column="STATUS" jdbcType="INTEGER" property="status" />
+        <result column="COMMANDID" jdbcType="DECIMAL" property="commandid" />
+        <result column="MESSAGE_NO" jdbcType="DECIMAL" property="message_no" />
+        <result column="CREATE_TIME" jdbcType="DECIMAL" property="createtime" />
+    </resultMap>
+    
+    <resultMap id="logMessageMap" type="com.aotain.common.utils.model.msg.LogMessage">
+        <result column="STAT_ID" jdbcType="DECIMAL" property="statId" />
+        <result column="TASKID" jdbcType="DECIMAL" property="topTaskId" />
+        <result column="HOUSEIDSTR" jdbcType="VARCHAR" property="houseidstr" />
+        <result column="COMMANDID" jdbcType="VARCHAR" property="smmscommandid" />
+        <result column="DATA_TYPE" jdbcType="INTEGER" property="data_type" />
+        <result column="STATISTIME" jdbcType="DECIMAL" property="statis_time" />
+        <result column="RECORD_NUM" jdbcType="DECIMAL" property="record_num" />
+        <result column="STATUS" jdbcType="INTEGER" property="status" />
+        <result column="CREATE_TIME" jdbcType="DECIMAL" property="createtime" />
+    </resultMap>
+
+	
+	<update id="updateLogStatusByTaskId">
+		update idc_isms_stat_log_report set status = #{status},update_time = sysdate where taskid = #{taskId,jdbcType=DECIMAL}
+	</update>
+	
+	
+	
+</mapper>

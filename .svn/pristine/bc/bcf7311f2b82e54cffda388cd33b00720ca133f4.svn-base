@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.smmsreturn.mapper.WaitBaseInforDao">
+	<resultMap id="JyzInfoMapWait" type="com.aotain.cu.serviceapi.model.IdcInformation">
+        <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+        <result column="IDCID" jdbcType="VARCHAR" property="idcId" />
+        <result column="IDCNAME" jdbcType="VARCHAR" property="idcName" />
+        <result column="IDCADD" jdbcType="VARCHAR" property="idcAddress" />
+        <result column="IDCZIP" jdbcType="VARCHAR" property="idcZipCode" />
+        <result column="CORP" jdbcType="VARCHAR" property="corporater" />
+        <result column="OFFICER_NAME" jdbcType="VARCHAR" property="officerName" />
+        <result column="OFFICER_IDTYPE" jdbcType="DECIMAL" property="officerIdType" />
+        <result column="OFFICER_ID" jdbcType="DECIMAL" property="officerId" />
+        <result column="OFFICER_EMAIL" jdbcType="VARCHAR" property="officerEmail" />
+        <result column="OFFICER_TEL" jdbcType="VARCHAR" property="officerTelephone" />
+        <result column="OFFICER_MOBILE" jdbcType="VARCHAR" property="officerMobile" />
+        <result column="EC_NAME" jdbcType="VARCHAR" property="ecName" />
+        <result column="EC_IDTYPE" jdbcType="DECIMAL" property="ecIdType" />
+        <result column="EC_ID" jdbcType="VARCHAR" property="ecId" />
+        <result column="EC_TEL" jdbcType="VARCHAR" property="ecTelephone" />
+        <result column="EC_MOBILE" jdbcType="VARCHAR" property="ecMobile" />
+        <result column="EC_EMAIL" jdbcType="VARCHAR" property="ecEmail" />
+        <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+        <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+        <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+        <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+        <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    </resultMap>
+    
+    <sql id="BASE_SQL">
+      JYZID,IDCID,IDCNAME,IDCADD,IDCZIP,CORP,OFFICER_NAME,OFFICER_IDTYPE,OFFICER_ID,OFFICER_TEL,OFFICER_MOBILE,OFFICER_EMAIL,EC_NAME,EC_IDTYPE,EC_ID,EC_TEL,EC_MOBILE,EC_EMAIL,
+      CZLX,CREATE_TIME,UPDATE_TIME,CREATE_USERID,UPDATE_USERID
+    </sql>
+    
+	<select id="getIdcInformation" resultMap="JyzInfoMapWait">
+      SELECT <include refid="BASE_SQL" />
+      FROM wait_isms_base_idc t WHERE 1=0 
+      <trim prefix="OR (" suffix=")" prefixOverrides="AND|OR">
+      		<if test="jyzIds!=null and jyzIds!=''">
+      			AND jyzid in (${jyzIds})
+      		</if>
+      		<if test="submitId!=null">
+      			AND submit_Id=#{submitId}
+      		</if>
+      		<if test="submitId==null and (jyzIds==null or jyzIds=='')">
+      			AND 1=0
+      		</if>
+      </trim>
+    </select>
+    
+    <resultMap id="HouseBaseResultMapWait" type="com.aotain.cu.serviceapi.model.HouseInformation">
+    <id column="HOUSESEQ_ID" jdbcType="DECIMAL" property="houseSeqId" />
+    <id column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="HOUSEIDSTR" jdbcType="VARCHAR" property="houseIdStr" />
+    <result column="HOUSENAME" jdbcType="VARCHAR" property="houseName" />
+    <result column="HOUSETYPE" jdbcType="INTEGER" property="houseType" />
+    <result column="HOUSEPROVINCE" jdbcType="INTEGER" property="houseProvince" />
+    <result column="HOUSECITY" jdbcType="INTEGER" property="houseCity" />
+    <result column="HOUSECOUNTY" jdbcType="INTEGER" property="houseCounty" />
+    <result column="HOUSEADD" jdbcType="VARCHAR" property="houseAddress" />
+    <result column="HOUSEZIP" jdbcType="VARCHAR" property="houseZipCode" />
+    <result column="HO_NAME" jdbcType="VARCHAR" property="houseOfficerName" />
+    <result column="HO_IDTYPE" jdbcType="INTEGER" property="houseOfficerIdType" />
+    <result column="HO_ID" jdbcType="VARCHAR" property="houseOfficerId" />
+    <result column="HO_TEL" jdbcType="VARCHAR" property="houseOfficerTelephone" />
+    <result column="HO_MOBILE" jdbcType="VARCHAR" property="houseOfficerMobile" />
+    <result column="HO_EMAIL" jdbcType="VARCHAR" property="houseOfficerEmail" />
+    <result column="CZLX" jdbcType="INTEGER" property="operateType" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="IDENTIFY" jdbcType="DECIMAL" property="identity" />
+    <result column="SUBORDINATEUNIT_AREACODE" jdbcType="VARCHAR" property="areaCode" />
+    <collection property="ipSegList" ofType="com.aotain.cu.serviceapi.model.HouseIPSegmentInformation" column="HOUSESEQ_ID" select="getIpSegList"></collection>
+    <collection property="userFrameList" ofType="com.aotain.cu.serviceapi.model.HouseUserFrameInformation" column="HOUSESEQ_ID" select="getUserFrameList"></collection>
+    <collection property="frameList" ofType="com.aotain.cu.serviceapi.model.HouseFrameInformation" column="HOUSESEQ_ID" select="getFrameList"></collection>
+    <collection property="gatewayInfoList" ofType="com.aotain.cu.serviceapi.model.HouseGatewayInformation" column="HOUSESEQ_ID" select="getGatewayInfoList"></collection> 
+  </resultMap>
+  
+  <sql id="house_field">
+    HOUSESEQ_ID,HOUSEID,JYZID,HOUSEIDSTR,HOUSENAME,HOUSETYPE,HOUSEPROVINCE,HOUSECITY,HOUSECOUNTY
+    ,HOUSEADD,HOUSEZIP,HO_NAME,HO_IDTYPE,HO_ID,HO_TEL,HO_MOBILE,HO_EMAIL,
+    CZLX,CREATE_TIME,UPDATE_TIME,CREATE_USERID,UPDATE_USERID,IDENTIFY
+    ,SUBORDINATEUNIT_AREACODE
+  </sql>
+
+  <select id="getHouseInformation" resultMap="HouseBaseResultMapWait">
+    select <include refid="house_field" /> from WAIT_ISMS_BASE_HOUSE  WHERE 1=0
+    <trim prefix="OR (" suffix=")" prefixOverrides="AND|OR">
+	    <if test="houseIds!=null and houseIds!=''">
+      			AND HOUSEID in (${houseIds})
+      		</if>
+      		<if test="submitId!=null">
+      			AND submit_Id=#{submitId}
+      		</if>
+      		<if test="submitId==null and (houseIds==null or houseIds=='') ">
+      			AND 1=0
+      		</if>
+	</trim>
+  </select>
+  <select id="getIpSegList" parameterType="java.lang.Integer" resultType="com.aotain.cu.serviceapi.model.HouseIPSegmentInformation">
+    SELECT
+    HOUSESEQ_ID as houseSeqId,
+    IPSEGID AS ipSegId,
+    USERNAME as userName,
+    IDTYPE as idType,
+    IDNUMBER AS idNumber,
+    CZLX AS operateType,
+    HOUSEID as houseId,
+    STARTIP as startIP,
+    ENDIP as endIP,
+    STARTIPSTR AS startIPStr,
+    endIPStr AS endIPStr,
+    IPTYPE AS ipType,
+    USETIME AS useTime,
+    SOURCEUNIT AS sourceUnit,
+    ALLOCATIONUNIT AS allocationUnit,
+    CREATE_TIME AS createTime,
+    UPDATE_TIME AS updateTime,
+    CREATE_USERID AS createUserId,
+    UPDATE_USERID AS updateUserId,
+    SUBORDINATEUNIT_AREACODE AS areaCode
+    FROM WAIT_ISMS_BASE_HOUSE_IPSEG
+    WHERE HOUSESEQ_ID = #{houseSeqId}
+  </select>
+ 
+  <select id="getUserFrameList" parameterType="java.lang.Integer" resultType="com.aotain.cu.serviceapi.model.HouseUserFrameInformation">
+   SELECT
+   HOUSESEQ_ID as houseSeqId,
+   FRAMEID AS frameId,
+   HOUSEID AS houseId,
+   USERNAME as userName,
+   IDTYPE AS idType,
+   IDNUMBER AS idNumber,
+   CREATE_TIME AS createTime,
+   UPDATE_TIME AS updateTime,
+   CREATE_USERID AS createUserId,
+   UPDATE_USERID AS updateUserId
+   FROM WAIT_ISMS_BASE_HOUSE_USERFRAME
+   WHERE HOUSESEQ_ID = #{houseSeqId}
+  </select>
+  
+  <select id="getFrameList" parameterType="java.lang.Integer" resultType="com.aotain.cu.serviceapi.model.HouseFrameInformation">
+    SELECT
+    HOUSESEQ_ID as houseSeqId,
+    FRAMEID AS frameId,
+    HOUSEID AS houseId,
+    FRAMENO AS frameNo,
+    FRAMENAME AS frameName,
+    USETYPE as useType,
+    DISTRIBUTION as distribution,
+    OCCUPANCY as occupancy,
+    SUBORDINATEUNIT_AREACODE AS areaCode,
+    CREATE_TIME AS createTime,
+    UPDATE_TIME AS updateTime,
+    CREATE_USERID AS createUserId,
+    UPDATE_USERID AS updateUserId,
+    CZLX AS operateType
+    FROM WAIT_ISMS_BASE_HOUSE_FRAME
+    WHERE HOUSESEQ_ID = #{houseSeqId}
+  </select>
+  
+  <select id="getGatewayInfoList" parameterType="java.lang.Integer" resultType="com.aotain.cu.serviceapi.model.HouseGatewayInformation">
+    SELECT
+    HOUSESEQ_ID as houseSeqId,
+    GATEWAYID AS gatewayId,
+    HOUSEID AS houseId,
+    BANDWIDTH AS bandWidth,
+    GATEWAYIP AS gatewayIP,
+    LINKTYPE as linkType,
+    ACCESSUNIT as accessUnit,
+    LINKNO as linkNo,
+    SUBORDINATEUNIT_AREACODE AS areaCode,
+    CREATE_TIME AS createTime,
+    UPDATE_TIME AS updateTime,
+    CREATE_USERID AS createUserId,
+    UPDATE_USERID AS updateUserId,
+    CZLX AS operateType
+    FROM WAIT_ISMS_BASE_HOUSE_GATEWAY
+    WHERE HOUSESEQ_ID = #{houseSeqId}
+  </select>
+  
+   <resultMap id="BaseUserResultMapWait" type="com.aotain.cu.serviceapi.model.UserInformation">
+    <id column="USERSEQ_ID" jdbcType="DECIMAL" property="userSeqId" />
+    <id column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="USERCODE" jdbcType="VARCHAR" property="userCode" />
+    <result column="NATURE" jdbcType="DECIMAL" property="nature" />
+    <result column="UNITNAME" jdbcType="VARCHAR" property="unitName" />
+    <result column="UNITNATURE" jdbcType="DECIMAL" property="unitNature" />
+    <result column="IDTYPE" jdbcType="DECIMAL" property="idType" />
+    <result column="IDNUMBER" jdbcType="VARCHAR" property="idNumber" />
+    <result column="OFFICER_EMAIL" jdbcType="VARCHAR" property="officerEmail" />
+    <result column="OFFICER_MOBILE" jdbcType="VARCHAR" property="officerMobile" />
+    <result column="OFFICER_TEL" jdbcType="VARCHAR" property="officerTelphone" />
+    <result column="OFFICER_ID" jdbcType="VARCHAR" property="officerId" />
+    <result column="OFFICER_IDTYPE" jdbcType="DECIMAL" property="officerIdType" />
+    <result column="OFFICER_NAME" jdbcType="VARCHAR" property="officerName" />
+    <result column="UNITADD" jdbcType="VARCHAR" property="unitAddress" />
+    <result column="ZIPCODE" jdbcType="VARCHAR" property="unitZipCode" />
+    <result column="REGISTERTIME" jdbcType="VARCHAR" property="registeTime" />
+    <result column="SERVERREGISTERTIME" jdbcType="VARCHAR" property="serviceRegTime" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="INFO_COMPLETE" jdbcType="VARCHAR" property="infoComplete" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+    <result column="UNITADDPROVINCEC" jdbcType="VARCHAR" property="unitAddressProvinceCode" />
+    <result column="UNITADDPROVINCEN" jdbcType="VARCHAR" property="unitAddressProvinceName" />
+    <result column="UNITADDCITYC" jdbcType="VARCHAR" property="unitAddressCityCode" />
+    <result column="UNITADDCITYN" jdbcType="VARCHAR" property="unitAddressCityName" />
+    <result column="UNITADDAREAC" jdbcType="VARCHAR" property="unitAddressAreaCode" />
+    <result column="UNITADDAREAN" jdbcType="VARCHAR" property="unitAddressAreaName" />
+    <result column="SUBORDINATEUNIT_AREACODE" jdbcType="VARCHAR" property="areaCode" />
+    <result column="IDENTIFY" jdbcType="VARCHAR" property="identify" />
+    <collection property="bandwidthList" column="USERSEQ_ID" select="getBandWidth"></collection>
+    <collection property="serviceList" column="USERSEQ_ID" select="getUserService"></collection>
+    <collection property="virtualList" column="USERSEQ_ID" select="getVirtualList"></collection>
+  </resultMap>
+
+  <resultMap id="BaseBandResultMap" type="com.aotain.cu.serviceapi.model.UserBandwidthInformation">
+    <id column="USERSEQ_ID" jdbcType="DECIMAL" property="userSeqId" />
+    <id column="HHID" jdbcType="DECIMAL" property="hhId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="DISTRIBUTETIME" jdbcType="VARCHAR" property="distributeTime" />
+    <result column="BANDWIDTH" jdbcType="DECIMAL" property="bandWidth" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+  </resultMap>
+  <select id="getBandWidth" parameterType="java.lang.Long" resultMap="BaseBandResultMap">
+    select
+    USERSEQ_ID, HHID, USERID, HOUSEID, DISTRIBUTETIME, BANDWIDTH, CREATE_TIME, UPDATE_TIME, CREATE_USERID,
+    UPDATE_USERID,CZLX
+    from WAIT_ISMS_BASE_USER_BANDWIDTH
+    where USERSEQ_ID = #{userSeqId,jdbcType=DECIMAL}
+  </select>
+  
+  <resultMap id="BaseServiceResultMap" type="com.aotain.cu.serviceapi.model.UserServiceInformation">
+    <id column="USERSEQ_ID" jdbcType="DECIMAL" property="userSeqId" />
+    <id column="SERVICEID" jdbcType="DECIMAL" property="serviceId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="SERVICECONTENT" jdbcType="VARCHAR" property="serviceContent" />
+    <result column="REGID" jdbcType="VARCHAR" property="registerId" />
+    <result column="SETMODE" jdbcType="DECIMAL" property="setmode" />
+    <result column="SERVICETYPE" jdbcType="DECIMAL" property="serviceType" />
+    <result column="BUSINESS" jdbcType="DECIMAL" property="business" />
+    <result column="REGTYPE" jdbcType="DECIMAL" property="regType" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+    <result column="SUBORDINATEUNIT_AREACODE" jdbcType="VARCHAR" property="areaCode" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <collection property="domainList" column="SERVICEID" select="getDomainList"></collection>
+  </resultMap>
+  <select id="getUserService" parameterType="java.lang.Long" resultMap="BaseServiceResultMap">
+    select
+    USERSEQ_ID, SERVICEID, USERID, SERVICECONTENT, REGID, SETMODE,SERVICETYPE, BUSINESS, REGTYPE, CREATE_TIME,
+    UPDATE_TIME, CREATE_USERID, UPDATE_USERID,CZLX,SUBORDINATEUNIT_AREACODE
+    from WAIT_ISMS_BASE_USER_SERVICE
+    where USERSEQ_ID = #{userSeqId,jdbcType=DECIMAL}
+  </select>
+  
+  <resultMap id="BaseDmoanResultMap" type="com.aotain.cu.serviceapi.model.ServiceDomainInformation">
+    <id column="USERSEQ_ID" jdbcType="DECIMAL" property="userSeqId" />
+    <id column="DOMAINID" jdbcType="DECIMAL" property="domainId" />
+    <result column="SERVICEID" jdbcType="DECIMAL" property="serviceId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="DOMAINNAME" jdbcType="VARCHAR" property="domainName" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USER_ID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+  </resultMap>
+  <select id="getDomainList" parameterType="java.lang.Long" resultMap="BaseDmoanResultMap">
+    select
+    USERSEQ_ID, DOMAINID, SERVICEID,USERID, DOMAINNAME,CZLX, CREATE_TIME, UPDATE_TIME, CREATE_USER_ID, UPDATE_USERID
+    from WAIT_ISMS_BASE_SERVICE_DOMAIN
+    where SERVICEID = #{serviceId,jdbcType=DECIMAL}
+  </select>
+  
+  <resultMap id="BaseVirtualResultMap" type="com.aotain.cu.serviceapi.model.UserVirtualInformation">
+    <id column="USERSEQ_ID" jdbcType="DECIMAL" property="userSeqId" />
+    <id column="VIRTUALID" jdbcType="DECIMAL" property="virtualId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="VIRTUALHOST_NAME" jdbcType="VARCHAR" property="name" />
+    <result column="VIRTUALHOST_STATE" jdbcType="DECIMAL" property="status" />
+    <result column="VIRTUALHOST_TYPE" jdbcType="DECIMAL" property="type" />
+    <result column="NETWORK_ADDRESS" jdbcType="VARCHAR" property="networkAddress" />
+    <result column="MGN_ADDRESS" jdbcType="OTHER" property="mgnAddress" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+  </resultMap>
+  
+  <select id="getVirtualList" parameterType="java.lang.Long" resultMap="BaseVirtualResultMap">
+    select
+    USERSEQ_ID, VIRTUALID, USERID, HOUSEID, VIRTUALHOST_NAME, VIRTUALHOST_STATE, VIRTUALHOST_TYPE,
+    NETWORK_ADDRESS, MGN_ADDRESS, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID,CZLX
+    from WAIT_ISMS_BASE_USER_VIRTUAL
+    where USERSEQ_ID = #{userSeqId,jdbcType=DECIMAL}
+  </select>
+
+  <sql id="Base_Column_List">
+    USERID, JYZID,USERCODE, NATURE, UNITNAME, UNITNATURE, IDTYPE, IDNUMBER, OFFICER_EMAIL, OFFICER_MOBILE,
+    OFFICER_TEL, OFFICER_ID, OFFICER_IDTYPE, OFFICER_NAME, UNITADD, ZIPCODE, REGISTERTIME, 
+    SERVERREGISTERTIME, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID,CZLX,IDENTIFY,
+    UNITADDPROVINCEC,UNITADDPROVINCEN,UNITADDCITYC,UNITADDCITYN,UNITADDAREAC,UNITADDAREAN,SUBORDINATEUNIT_AREACODE
+  </sql>
+  <select id="getUserInformation" parameterType="com.aotain.cu.serviceapi.model.UserInformation" resultMap="BaseUserResultMapWait">
+    select 
+    <include refid="Base_Column_List" />
+    from WAIT_ISMS_BASE_USER
+    WHERE 1=0
+    <trim prefix="OR (" suffix=")" prefixOverrides="AND|OR">
+	    <if test="userIds!=null and userIds!=''">
+      			AND USERID in (${userIds})
+      		</if>
+      		<if test="submitId!=null">
+      			AND submit_Id=#{submitId}
+      		</if>
+      		<if test="submitId==null and (houseIds==null or houseIds=='') ">
+      			AND 1=0
+      		</if>
+	</trim>
+  </select>
+</mapper>

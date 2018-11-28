@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.smmsreturn.mapper.SubmitReportFileDao">
+	<resultMap type="com.aotain.smmsapi.task.bean.IsmsWaitSubmitReportFile" id="reportFileMap">
+		<id column="REPORT_FILENAME" jdbcType="VARCHAR" property="reportFileName" />
+	    <result column="SUBMIT_ID" jdbcType="DECIMAL" property="submitId" />
+	    <result column="REPORT_TYPE" jdbcType="DECIMAL" property="reportType" />
+	    <result column="DEAL_FLAG" jdbcType="DECIMAL" property="dealFlag" />
+	    <result column="JYZ_ID" jdbcType="VARCHAR" property="jyzId" />
+	    <result column="HOUSE_ID" jdbcType="VARCHAR" property="houseId" />
+	    <result column="USER_ID" jdbcType="VARCHAR" property="userId" />
+	</resultMap>
+
+	<select id="getReportFileInfo" resultMap="reportFileMap">
+		SELECT * FROM WAIT_ISMS_SUBMIT_REPORTFILE WHERE 1=0
+		<if test="fileName!=null and fileName!=''">
+			OR (report_filename=#{fileName})
+		</if>
+	</select>
+	
+	<update id="updateDealFlag">
+		UPDATE WAIT_ISMS_SUBMIT_REPORTFILE SET DEAL_FLAG=#{dealFlag} WHERE REPORT_FILENAME=#{fileName}
+	</update>
+	
+	<update id="updateReturnInfor">
+		UPDATE WAIT_ISMS_SUBMIT_REPORTFILE SET FILE_RESULT_INFO=#{cacheStr} WHERE REPORT_FILENAME=#{fileName}
+	</update>
+
+	<select id="countSubmitFile" resultType="java.lang.Integer">
+		SELECT count(1) FROM WAIT_ISMS_SUBMIT_REPORTFILE WHERE 1=1
+		<if test="submitId!=null">
+			and (SUBMIT_ID=#{submitId})
+		</if>
+		<if test="dealFlag!=null and dealFlag >= 0">
+			and (DEAL_FLAG=#{dealFlag})
+		</if>
+	</select>
+	
+	<update id="updateSubmitLogStatus">
+		UPDATE WAIT_ISMS_SUBMIT_REPORTLOG SET DEAL_FLAG=#{dealFlag} WHERE SUBMIT_ID=#{submitId}
+	</update>
+	
+	<insert id="insertApproveProcess" parameterType="com.aotain.cu.serviceapi.model.WaitApproveProcess">
+        insert into WAIT_APPROVE_PROCESS
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            approve_id,
+            <if test="submitId != null">
+                submit_id,
+            </if>
+            type,
+            data_id,
+            deal_flag,
+            <if test="warnData != null">
+                warn_data,
+            </if>
+            deal_time,
+            create_time,
+            update_time,
+            <if test="createUser != null">
+                create_user,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{approveId},
+            <if test="submitId != null">
+                #{submitId},
+            </if>
+            #{type},#{dataId},#{dealFlag},
+            <if test="warnData != null">
+                #{warnData},
+            </if>
+            #{dealTime},#{createTime},#{updateTime},
+            <if test="createUser != null">
+                #{createUser},
+            </if>
+        </trim>
+    </insert>
+	
+	<update id="updateApproveProcess" parameterType="com.aotain.cu.serviceapi.model.WaitApproveProcess">
+		UPDATE WAIT_APPROVE_PROCESS
+		<set>
+				<if test="submitId != null">
+					submit_id=#{submitId},
+				</if>
+				<if test="type!=null">
+					type=#{type},
+				</if>
+				<if test="dataId!=null">
+					data_id=#{dataId},
+				</if>
+				<if test="warnData != null">
+					warn_data=#{warnData},
+				</if>
+				<if test="createUser != null">
+					create_user=#{createUser},
+				</if>
+				update_time=sysdate,
+				deal_time=sysdate,
+		</set>
+		WHERE approve_id=#{approveId} AND deal_flag=#{dealFlag}
+	</update>
+	
+	<select id="getApproveProcess" parameterType="com.aotain.cu.serviceapi.model.WaitApproveProcess" resultType="int">
+		SELECT Count(1) FROM WAIT_APPROVE_PROCESS WHERE approve_id=#{approveId} AND deal_flag=#{dealFlag}
+	</select>
+</mapper>

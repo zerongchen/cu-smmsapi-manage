@@ -1,0 +1,197 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.aotain.common.config.LocalConfig;
+import com.aotain.common.utils.kafka.KafkaProducer;
+import com.aotain.cu.serviceapi.model.HouseIPSegmentInformation;
+import com.aotain.cu.serviceapi.model.HouseInformation;
+import com.aotain.cu.serviceapi.model.HouseUserFrameInformation;
+import com.aotain.cu.serviceapi.model.UserInformation;
+import com.aotain.smmsapi.task.constant.DealFlagConstant;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateHouseDao;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateHouse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+
+@Service
+public class PreValidateHouseImpl implements PreValidateHouse {
+
+    private static Logger logger = LoggerFactory.getLogger(PreValidateHouseImpl.class);
+
+    @Autowired
+    private PreValidateHouseDao preValidateHouseDao;
+
+    @Override
+    public void handleValidateHouse() {
+        try {
+            List<HouseInformation> houseInformations = preValidateHouseDao.getValidateHouseList(new HouseInformation());
+            if(houseInformations!=null && !houseInformations.isEmpty()){
+                for (HouseInformation houseInformation:houseInformations){
+                    handHouseInfo(houseInformation);
+                }
+            }
+        }catch (Exception e){
+            logger.error("handle validate JYZ error ",e);
+        }
+
+    }
+
+    public void handHouseInfo( HouseInformation houseInformation){
+        if (houseInformation==null) return;
+        int houseNum;
+        switch (houseInformation.getOperateType()){
+            //新增
+            case 1:
+                houseNum = preValidateHouseDao.houseNum(houseInformation);
+                if(houseNum>0){
+                    //正式表存在该机房 核验失败 写数据库
+                    houseInformation.setVerificationResult("正式表存在该机房,新增失败");
+                    handVarifyFail(houseInformation,null);
+                }else {
+//                    validateIdc(houseInformation);
+                    //获取用户信息
+                    List<UserInformation> users = preValidateHouseDao.getPreUsers(houseInformation);
+                    if (users==null || users.isEmpty()){
+                        handVarifyPass(houseInformation,null);
+                    }else {
+                        List<UserInformation> userInformations=new ArrayList<UserInformation>();
+                        for (UserInformation userInformation:users){
+                            //0 1 3 6
+                            if(userInformation.getDealFlag().intValue()==DealFlagConstant.UN_PRE_VARIFY.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()==DealFlagConstant.PRE_VARIFY_FAIL.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()==DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()==DealFlagConstant.UN_PRE_VARIFY.getDealFlag()){
+//                                userInformation.setVerificationResult(DealFlagConstant.getDealDesc(userInformation.getDealFlag().intValue()));
+                                userInformations.add(userInformation);
+                            }
+                        }
+                        if(userInformations.isEmpty()){
+                            //没有需要等待的
+                            handVarifyPass(houseInformation,userInformations);
+                        }else {
+                            //需要等待,不做任何操作
+                            return;
+                        }
+                    }
+                }
+                break;
+            case 2:
+                houseNum = preValidateHouseDao.houseNum(houseInformation);
+                if(houseNum!=1){
+                    //正式表不存在该机房 核验失败 写数据库
+                    houseInformation.setVerificationResult("正式表不存在该机房,修改失败");
+                    handVarifyFail(houseInformation,null);
+                }else {
+                    //机架信息,操作表
+                    List<HouseUserFrameInformation> userFrameInformations = houseInformation.getUserFrameList();
+                    //Ip信息,操作表
+                    List<HouseIPSegmentInformation> ipSegmentInformations = houseInformation.getIpSegList();
+                    //正式表存在该机房 ,identity==1？提取机房IP地址的所属客户信息:提取机房IP地址的所属客户信息+提取机房机架的所属客户信息
+                    List<UserInformation> preUsers=null;
+                    if (houseInformation.getIdentity()!=1){
+//                      提取机房IP地址的所属客户信息+提取机房机架的所属客户信息
+                        preUsers = preValidateHouseDao.getPreUsers(houseInformation);
+                    }else {
+                        //提取机房IP地址的所属客户信息
+                        houseInformation.setUserFrameList(new ArrayList<HouseUserFrameInformation>());
+                        preUsers = preValidateHouseDao.getPreUsers(houseInformation);
+                    }
+                    //提取正式表的,该机房的信息
+                    HouseInformation rptHouse = preValidateHouseDao.getRptHouse(houseInformation);
+                    List<UserInformation> rptUsers = preValidateHouseDao.getRptUsers(rptHouse);
+                    //preUsers:操作表中挂在机房下面的用户 rptUsers:正式表中挂在机房下面的用户
+
+                    List<UserInformation> addUsers = new ArrayList<UserInformation>();
+                    List<UserInformation> modifyUser = new ArrayList<UserInformation>();
+                    List<UserInformation> deleteUsers = new ArrayList<UserInformation>();
+
+                    //modifyUser 是操作表和上报表共有的用户,改用户有状态Deal_flag
+                    for (UserInformation preUser:preUsers){
+                        for (UserInformation rptUser:rptUsers){
+                            if (preUser.getUserId().intValue()== rptUser.getUserId().intValue()){
+                                modifyUser.add(preUser);
+                            }
+                        }
+                    }
+                    //addUsers 是在操作表,但是不存在上报表的用户,改用户有状态Deal_flag
+                    addUsers.addAll(preUsers);
+                    addUsers.removeAll(modifyUser);
+                    //deleteUsers 是不在操作表,但是存在上报表的用户,改用户没有有状态Deal_flag,需要重新在操作表中获取
+                    deleteUsers.addAll(rptUsers);
+                    deleteUsers.removeAll(modifyUser);
+                    deleteUsers = preValidateHouseDao.getPreUsersByRptUser(deleteUsers);
+                    if (!modifyUser.isEmpty()){
+                        for (UserInformation userInformation:modifyUser){
+                            if(userInformation.getDealFlag().intValue()!=DealFlagConstant.RPT_FAIL.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()!=DealFlagConstant.RPT_VARIFY.getDealFlag()){
+                                //如存在状态不是上报成功或者上报审核中的记录,等待
+                                return;
+                            }
+                            userInformation.setOperateType(2);
+                        }
+                    }
+                    if (!addUsers.isEmpty()){
+                        for (UserInformation userInformation:addUsers){
+                            if(userInformation.getDealFlag().intValue()!=DealFlagConstant.RPT_FAIL.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()!=DealFlagConstant.RPT_VARIFY.getDealFlag()){
+                                //如存在状态不是上报成功或者上报审核中的记录,等待
+                                return;
+                            }
+                            userInformation.setOperateType(1);
+
+                        }
+                    }
+                    if (!deleteUsers.isEmpty()){
+                        for (UserInformation userInformation:deleteUsers){
+                            if(userInformation.getDealFlag().intValue()!=DealFlagConstant.RPT_FAIL.getDealFlag()
+                                    || userInformation.getDealFlag().intValue()!=DealFlagConstant.RPT_VARIFY.getDealFlag()){
+                                //如存在状态不是上报成功或者上报审核中的记录,等待
+                                return;
+                            }
+                            userInformation.setOperateType(3);
+                        }
+                    }
+                    modifyUser.addAll(modifyUser);
+                    modifyUser.addAll(addUsers);
+                    handVarifyPass(houseInformation,modifyUser);
+                }
+                break;
+            case 3:
+
+                break;
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED,rollbackFor = Exception.class)
+    public void validateIdc(HouseInformation houseInformation){
+
+
+    }
+
+    public void handVarifyPass(HouseInformation houseInformation,List<UserInformation> userInformations){
+        houseInformation.setDealFlag(DealFlagConstant.SUB_RPT.getDealFlag());
+        preValidateHouseDao.submitHouse(houseInformation);
+
+        //write kafka
+        Map<String, Object> conf = LocalConfig.getInstance().getKafkaProducerConf();
+        KafkaProducer producer = new KafkaProducer(conf);
+
+    }
+
+    public void handVarifyFail(HouseInformation houseInformation,List<UserInformation> userInformations){
+        houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+//        if (userInformations!=null){
+//            StringBuilder sb = new StringBuilder();
+//            for (UserInformation userInformation:userInformations){
+//                sb.append(userInformation.getVerificationResult()).append("\r\n");
+//            }
+//            houseInformation.setVerificationResult(sb.toString());
+//        }
+        preValidateHouseDao.submitHouse(houseInformation);
+    }
+}

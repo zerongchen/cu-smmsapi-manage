@@ -1,0 +1,28 @@
+package com.aotain.smmsapi.task;
+
+import com.aotain.cu.serviceapi.model.IdcInformation;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateIdcDao;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mortbay.util.ajax.JSON;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import java.util.List;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations = { "classpath:spring/spring-base.xml" })
+public class PreValidate {
+
+	@Autowired
+	private PreValidateIdcDao preValidateIdcDao;
+	
+
+	@Test
+	public void updateLogStatus(){
+
+		List<IdcInformation> list = preValidateIdcDao.getValidateIdcList(new IdcInformation());
+		System.out.println(JSON.toString(list));
+	}
+}

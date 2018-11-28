@@ -1,0 +1,143 @@
+package com.aotain.smmsapi.task;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import com.alibaba.fastjson.JSON;
+import com.aotain.common.config.ContextUtil;
+import com.aotain.common.config.redis.BaseRedisService;
+import com.aotain.common.utils.tools.EnvironmentUtils;
+import com.aotain.cu.serviceapi.dto.ResultDto;
+import com.aotain.cu.serviceapi.model.HouseInformation;
+import com.aotain.cu.serviceapi.model.IdcInformation;
+import com.aotain.cu.serviceapi.model.UserInformation;
+import com.aotain.cu.serviceapi.utils.BaseFeignBuilder;
+import com.aotain.cu.serviceapi.utils.BaseFeignBuilder.EncodeDecodeType;
+import com.aotain.cu.serviceapi.utils.ServiceAddressSelector;
+import com.aotain.smmsapi.task.bean.SmmsResultCache;
+import com.aotain.smmsapi.task.serviceapi.DemoServiceHystrix;
+import com.aotain.smmsapi.task.serviceapi.IDemoService;
+import com.aotain.smmsapi.task.serviceapi.IDemoService.UserBean;
+import com.aotain.smmsapi.task.serviceapi.preinput.IPreinputService;
+import com.aotain.smmsapi.task.serviceapi.preinput.PreinputServiceFallback;
+import com.aotain.smmsapi.task.smmsreturn.mapper.OperatorStatusDao;
+import com.aotain.smmsapi.task.smmsreturn.mapper.OperatorTablesDao;
+import com.aotain.smmsapi.task.smmsreturn.mapper.SubmitReportFileDao;
+import com.aotain.smmsapi.task.smmsreturn.mapper.WaitBaseInforDao;
+import com.aotain.smmsapi.task.smmsreturn.service.SmmsReturnService;
+import com.aotain.smmsapi.task.smmsreturn.service.impl.SmmsReturnServiceImpl;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations = { "classpath:spring-smmstask-quartz.xml" })
+public class SmmsReturnTest {
+
+	@Autowired
+	private SmmsReturnService service;
+	
+	@Autowired
+	private WaitBaseInforDao waitBaseInforDao;
+
+	@org.junit.Test
+	public void run() {
+		service.doProcess(2552092L, "15338811310002552092.xml", 1, 1);
+	}
+
+	private void init() {
+		EnvironmentUtils.ConfigBuilder cb = new EnvironmentUtils.ConfigBuilder();
+		cb.append(EnvironmentUtils.WORK_PATH, ".");
+		cb.append(EnvironmentUtils.LOG4J_PATH, "config/log4j-quartz.properties");
+		cb.append(EnvironmentUtils.EVN_DIR, "cu-smmsapi-task-quartz");
+		EnvironmentUtils.init(cb.build());
+		ServiceAddressSelector.init(EnvironmentUtils.loadPropertiesFromEnv("ribbon.properties"));
+	}
+	
+	@Test
+	public void testHouseQuery() {
+		List<HouseInformation> houseList = waitBaseInforDao.getHouseInformation(617L, "4337");
+		System.out.println(JSON.toJSONString(houseList));
+	}
+	
+	@Test
+	public void serviceApiTest() {
+		init();
+		// 加载项目配置															 
+		IDemoService idemo = BaseFeignBuilder.getCacheFeign(IDemoService.class, "myclient", new DemoServiceHystrix(),BaseFeignBuilder.EncodeDecodeType.EDT_JSON_JSON);
+		System.out.println("XXXXXXXXXXX：" + idemo.sayHello(new UserBean("liuz-刘照")));
+		System.out.println("XXXXXXXXXXX：" + idemo.sayHello1(new UserBean("liuz-大的说法")));
+		// System.out.println("XXXXXXXXXXX："+idemo.sayHello(new
+		// UserBean("liuzhao")));
+	}
+
+	@Test
+	public void preinputApiTest() {
+		init();
+		IPreinputService ipService = BaseFeignBuilder.getCacheFeign(IPreinputService.class,
+				IPreinputService.CLIENT_NAME, new PreinputServiceFallback(),EncodeDecodeType.EDT_PLAIN_JSON);
+		Map<String,Object> params = new HashMap<String,Object>();
+		params.put("houseId", "1231888");
+//		ResultDto result = ipService.houseApprove(params);
+		ResultDto result = ipService.houseApprove("4308");
+		System.out.println("机房预审结果："+result);
+		result = ipService.userApprove("30331");
+		System.out.println("用户预审结果："+result);
+	}
+	
+	@Autowired
+	private SubmitReportFileDao submitReportFileDao;
+	
+	@Autowired
+	private OperatorStatusDao operatorStatusDao;
+	
+	@Test
+	public void dbTest(){
+		init();
+		System.out.println("XXXXX:"+submitReportFileDao.updateDealFlag("15338811310002552092.xml", 2));
+		//System.out.println("XXXXX:"+operatorStatusDao.updateJyzDealFlag("68", 5));
+		//System.out.println("XXXXX:"+operatorStatusDao.updateHouseDealFlag("4307,4308", 5));
+		//System.out.println("XXXXX:"+operatorStatusDao.updateUserDealFlag("30344,30342", 5));
+	}
+	
+	@Autowired
+	private WaitBaseInforDao wdao;
+	@Test
+	public void  waitTableTest(){
+		init();
+		List<IdcInformation> info = wdao.getIdcInformation(242l, "68,67");
+		System.out.println(info);
+		List<HouseInformation> house = wdao.getHouseInformation(838, "4559");
+		System.out.println(house);
+		List<UserInformation> user = wdao.getUserInformation(155, "116929");
+		System.out.println(user);
+		
+	}
+	
+	@Autowired
+	private SmmsReturnServiceImpl rs;
+	
+	@Test
+	public void test999Return() {
+		Long taskId = 111L;
+		SmmsResultCache cache = new SmmsResultCache();
+		cache.setTaskId(taskId);
+		cache.setFileName("15378652510002664473");
+		cache.setFileType(1);
+		cache.setStatus(0);
+		try {
+			ContextUtil.getContext().getBean("baseRedisServiceImpl", BaseRedisService.class).putHash("smms_999_file_result", cache.getFileName(), JSON.toJSONString(cache));
+			rs.doProcess(1111L, cache.getFileName(), 0, 1);
+		}catch(Exception e){
+			
+		}
+	}
+	
+	
+
+}

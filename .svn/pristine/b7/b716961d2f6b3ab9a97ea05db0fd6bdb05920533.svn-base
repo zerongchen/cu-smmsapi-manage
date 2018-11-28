@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="returnInfo">
+		<xs:annotation>
+			<xs:documentation>退回的基础数据信息</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="idcId" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>电信管理部门颁发的IDC许可证号</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="returnCode" type="xs:long">
+					<xs:annotation>
+						<xs:documentation>自动退回原因：0-上报记录通过核验；1-上报数据与既有数据记录冲突；2-上报数据记录不完整；3-上报数据内容错误；4-其他原因退回</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="returnMsg" type="xs:string" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>填写退回原因</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="returnData" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>退回数据</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:choice>
+							<xs:element name="house" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>退回的机房数据</xs:documentation>
+								</xs:annotation>
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="houseId" type="xs:long">
+											<xs:annotation>
+												<xs:documentation>退回的机房ID</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="gatewayId" type="xs:long" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>退回的机房链路ID</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="ipSegId" type="xs:long" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>退回的机房IP段ID</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="frameInfoId" type="xs:long" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>退回的机房机架ID</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+							<xs:element name="user" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>退回的用户数据</xs:documentation>
+								</xs:annotation>
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="userId" type="xs:long">
+											<xs:annotation>
+												<xs:documentation>退回的用户ID或者要从中退回应用服务/应用服务域名/占用机房信息的用户ID</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="service" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>退回的应用服务数据</xs:documentation>
+											</xs:annotation>
+											<xs:complexType>
+												<xs:sequence>
+													<xs:element name="serviceId" type="xs:long">
+														<xs:annotation>
+															<xs:documentation>退回的应用服务ID或者要从中退回应用服务域名及占用机房信息的应用服务ID</xs:documentation>
+														</xs:annotation>
+													</xs:element>
+													<xs:element name="domainId" type="xs:long" minOccurs="0">
+														<xs:annotation>
+															<xs:documentation>退回的应用服务域名ID（应用服务ID必填）</xs:documentation>
+														</xs:annotation>
+													</xs:element>
+													<xs:element name="hhId" type="xs:long" minOccurs="0">
+														<xs:annotation>
+															<xs:documentation>退回的占用机房信息ID（应用服务ID必填）</xs:documentation>
+														</xs:annotation>
+													</xs:element>
+												</xs:sequence>
+											</xs:complexType>
+										</xs:element>
+										<xs:element name="hhId" type="xs:long" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>退回的占用机房信息ID</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:choice>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="timeStamp" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>数据生成时间</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

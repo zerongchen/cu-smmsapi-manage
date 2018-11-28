@@ -1,0 +1,6 @@
+# ack上报kafka配置
+ack.kafka.topic=smmsackqueue
+ack.kafka.constomer.threadNum=10
+
+# ack上报省份标识 
+resourceMonitorFlag=NA

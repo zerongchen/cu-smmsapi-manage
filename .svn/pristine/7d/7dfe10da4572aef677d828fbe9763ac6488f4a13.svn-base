@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.aotain.smmsapi.task.quartz.mapper.TaskFileDao">
+
+	<update id="updateFileStatus">
+		update idc_monitor_task_file set status = #{status},deal_result = #{dealresult}, modify_time = sysdate where file_name = #{filename}
+	</update>
+	
+</mapper>

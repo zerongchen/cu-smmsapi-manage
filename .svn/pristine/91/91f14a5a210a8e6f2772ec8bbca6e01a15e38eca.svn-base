@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.prevalidate.mapper.PreValidateUserDao">
+  <resultMap id="BaseResultMap" type="com.aotain.cu.serviceapi.model.UserInformation">
+    <id column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="USERCODE" jdbcType="VARCHAR" property="userCode" />
+    <result column="NATURE" jdbcType="DECIMAL" property="nature" />
+    <result column="UNITNAME" jdbcType="VARCHAR" property="unitName" />
+    <result column="UNITNATURE" jdbcType="DECIMAL" property="unitNature" />
+    <result column="IDTYPE" jdbcType="DECIMAL" property="idType" />
+    <result column="IDNUMBER" jdbcType="VARCHAR" property="idNumber" />
+    <result column="OFFICER_EMAIL" jdbcType="VARCHAR" property="officerEmail" />
+    <result column="OFFICER_MOBILE" jdbcType="VARCHAR" property="officerMobile" />
+    <result column="OFFICER_TEL" jdbcType="VARCHAR" property="officerTelphone" />
+    <result column="OFFICER_ID" jdbcType="VARCHAR" property="officerId" />
+    <result column="OFFICER_IDTYPE" jdbcType="DECIMAL" property="officerIdType" />
+    <result column="OFFICER_NAME" jdbcType="VARCHAR" property="officerName" />
+    <result column="UNITADD" jdbcType="VARCHAR" property="unitAddress" />
+    <result column="ZIPCODE" jdbcType="VARCHAR" property="unitZipCode" />
+    <result column="REGISTERTIME" jdbcType="VARCHAR" property="registeTime" />
+    <result column="SERVERREGISTERTIME" jdbcType="VARCHAR" property="serviceRegTime" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="DEAL_FLAG" jdbcType="DECIMAL" property="dealFlag" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+    <result column="IDENTIFY" jdbcType="DECIMAL" property="identity" />
+    <collection property="bandwidthList" column="USERID" select="getBandWidth"></collection>
+  </resultMap>
+
+  <resultMap id="BaseBandResultMap" type="com.aotain.cu.serviceapi.model.UserBandwidthInformation">
+    <id column="HHID" jdbcType="DECIMAL" property="hhId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="DISTRIBUTETIME" jdbcType="VARCHAR" property="distributeTime" />
+    <result column="BANDWIDTH" jdbcType="DECIMAL" property="bandWidth" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <result column="DEAL_FLAG" jdbcType="DECIMAL" property="dealFlag" />
+    <result column="CZLX" jdbcType="DECIMAL" property="operateType" />
+  </resultMap>
+  <select id="getBandWidth" parameterType="java.lang.Long" resultMap="BaseBandResultMap">
+    select
+    HHID, USERID, HOUSEID, DISTRIBUTETIME, BANDWIDTH, CREATE_TIME, UPDATE_TIME, CREATE_USERID,
+    UPDATE_USERID,DEAL_FLAG,CZLX
+    from IDC_ISMS_BASE_USER_HH
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+
+
+  <sql id="Base_Column_List">
+    USERID, JYZID,USERCODE, NATURE, UNITNAME, UNITNATURE, IDTYPE, IDNUMBER, OFFICER_EMAIL, OFFICER_MOBILE,
+    OFFICER_TEL, OFFICER_ID, OFFICER_IDTYPE, OFFICER_NAME, UNITADD, ZIPCODE, REGISTERTIME, 
+    SERVERREGISTERTIME, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID,DEAL_FLAG,CZLX,IDENTIFY
+  </sql>
+  <select id="getValidateUserList" parameterType="com.aotain.cu.serviceapi.model.UserInformation" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from IDC_ISMS_BASE_USER
+    WHERE 1=1
+    <choose>
+      <when test="dealFlag!=null">
+        AND DEAL_FLAG=#{dealFlag}
+      </when>
+      <otherwise>
+        AND DEAL_FLAG=2
+      </otherwise>
+    </choose>
+  </select>
+  
+  <select id="getPreHouse" parameterType="com.aotain.cu.serviceapi.model.UserInformation" resultType="com.aotain.cu.serviceapi.model.HouseInformation">
+    <choose>
+      <when test="bandwidthList!=null and bandwidthList.size()>0">
+        SELECT
+        HOUSEID as houseId,
+        jyzId as jyzId,
+        HOUSEIDSTR as houseIdStr,
+        HOUSENAME AS houseName,
+        HOUSETYPE AS houseType,
+        DEAL_FLAG as dealFlag,
+        CZLX AS operateType
+        FROM IDC_ISMS_BASE_HOUSE
+        WHERE 1=1 AND (
+        <foreach collection="bandwidthList" item="item" separator="," open="(" close=")">
+          #{item.houseId}
+        </foreach>
+      </when>
+      <otherwise>
+        select NULL from dual where rownum=0;
+      </otherwise>
+    </choose>
+  </select>
+  
+  <select id="userNum" resultType="java.lang.Integer" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    SELECT count(1) from RPT_ISMS_BASE_USER t
+    WHERE 1=1
+    <if test="userId">
+      AND USERID=#{userId}
+    </if>
+    <if test="unitName!=null">
+      AND UNITNAME=#{unitName}
+    </if>
+    <if test="idType!=null">
+      AND IDTYPE=#{idType}
+    </if>
+    <if test="idNumber!=null">
+      AND IDNUMBER=#{idNumber}
+    </if>
+    <if test="jyzId!=null">
+      AND JYZID=#{jyzId}
+    </if>
+  </select>
+  
+  <update id="submitHouse" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    UPDATE IDC_ISMS_BASE_USER
+    <set>
+      <if test="dealFlag!=null">
+        DEAL_FLAG=#{dealFlag},
+      </if>
+      <if test="verificationResult!=null">
+        VERIFICATION_RESULT=#{verificationResult}
+      </if>
+    </set>
+    WHERE HOUSEID=#{houseId}
+    and DEAL_FLAG!=0
+  </update>
+  
+  <resultMap id="RptBaseResultMap" type="com.aotain.cu.serviceapi.model.UserInformation">
+    <id column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="JYZID" jdbcType="DECIMAL" property="jyzId" />
+    <result column="NATURE" jdbcType="DECIMAL" property="nature" />
+    <result column="UNITNAME" jdbcType="VARCHAR" property="unitName" />
+    <result column="UNITNATURE" jdbcType="DECIMAL" property="unitNature" />
+    <result column="IDTYPE" jdbcType="DECIMAL" property="idType" />
+    <result column="IDNUMBER" jdbcType="VARCHAR" property="idNumber" />
+    <result column="OFFICER_EMAIL" jdbcType="VARCHAR" property="officerEmail" />
+    <result column="OFFICER_MOBILE" jdbcType="VARCHAR" property="officerMobile" />
+    <result column="OFFICER_TEL" jdbcType="VARCHAR" property="officerTelphone" />
+    <result column="OFFICER_ID" jdbcType="VARCHAR" property="officerId" />
+    <result column="OFFICER_IDTYPE" jdbcType="DECIMAL" property="officerIdType" />
+    <result column="OFFICER_NAME" jdbcType="VARCHAR" property="officerName" />
+    <result column="UNITADD" jdbcType="VARCHAR" property="unitAddress" />
+    <result column="ZIPCODE" jdbcType="VARCHAR" property="unitZipCode" />
+    <result column="REGISTERTIME" jdbcType="VARCHAR" property="registeTime" />
+    <result column="SERVERREGISTERTIME" jdbcType="VARCHAR" property="serviceRegTime" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+    <collection property="bandwidthList" column="USERID" select="getRptBandWidth"></collection>
+  </resultMap>
+  
+  <select id="getRptHouse" resultMap="RptBaseResultMap" parameterType="com.aotain.cu.serviceapi.model.UserInformation">
+    SELECT USERID, JYZID, NATURE, UNITNAME, UNITNATURE, IDTYPE, IDNUMBER, OFFICER_EMAIL, OFFICER_MOBILE,
+    OFFICER_TEL, OFFICER_ID, OFFICER_IDTYPE, OFFICER_NAME, UNITADD, ZIPCODE, REGISTERTIME,
+    SERVERREGISTERTIME, CREATE_TIME, UPDATE_TIME, CREATE_USERID, UPDATE_USERID
+    FROM RPT_ISMS_BASE_USER
+    WHERE USERID=#{userId} AND JYZID=#{jyzId}
+  </select>
+  
+  <resultMap id="RptBaseBandResultMap" type="com.aotain.cu.serviceapi.model.UserBandwidthInformation">
+    <id column="HHID" jdbcType="DECIMAL" property="hhId" />
+    <result column="USERID" jdbcType="DECIMAL" property="userId" />
+    <result column="HOUSEID" jdbcType="DECIMAL" property="houseId" />
+    <result column="DISTRIBUTETIME" jdbcType="VARCHAR" property="distributeTime" />
+    <result column="BANDWIDTH" jdbcType="DECIMAL" property="bandWidth" />
+    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="UPDATE_TIME" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+    <result column="UPDATE_USERID" jdbcType="DECIMAL" property="updateUserId" />
+  </resultMap>
+  <select id="getRptBandWidth" parameterType="java.lang.Long" resultMap="RptBaseBandResultMap">
+    select
+    HHID, USERID, HOUSEID, DISTRIBUTETIME, BANDWIDTH, CREATE_TIME, UPDATE_TIME, CREATE_USERID,
+    UPDATE_USERID
+    from RPT_ISMS_BASE_USER_BANDWIDTH
+    where USERID = #{userId,jdbcType=DECIMAL}
+  </select>
+
+</mapper>

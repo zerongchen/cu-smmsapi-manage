@@ -1,0 +1,47 @@
+package com.aotain.smmsapi.task.quartz.impl;
+
+import com.aotain.smmsapi.task.QuartzMain;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateHouse;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateIdc;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateUser;
+import com.aotain.smmsapi.task.quartz.PreValidateService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+
+@Component
+@Service("preValidate")
+public class PreValidateServiceImpl implements PreValidateService {
+
+    private static Logger logger = LoggerFactory.getLogger(PreValidateServiceImpl.class);
+
+    @Autowired
+    private PreValidateIdc preValidateIdc;
+
+    @Autowired
+    private PreValidateHouse preValidateHouse;
+
+    @Autowired
+    private PreValidateUser preValidateUser;
+
+
+    @Override
+    public void handlePreValidate() {
+        if(QuartzMain.LSELECTOR == null || !QuartzMain.LSELECTOR.getLeader()){
+            logger.debug("service node(" + QuartzMain.SERVICE_NODE_NAME + ") is sleeping ...");
+            return;
+        }else{
+            logger.info("service node(" + QuartzMain.SERVICE_NODE_NAME + ") is working ...");
+        }
+        logger.info("validate preInput begin... ...");
+        preValidateIdc.handleValidateIdc();
+        preValidateHouse.handleValidateHouse();
+        preValidateUser.handleValidateUser();
+        logger.info("validate preInput end");
+    }
+
+
+
+}

@@ -1,0 +1,493 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	elementFormDefault="qualified" attributeFormDefault="unqualified">
+	<xs:element name="codeList">
+		<xs:annotation>
+			<xs:documentation>代码表发布指令</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="commandId" type="xs:long">
+					<xs:annotation>
+						<xs:documentation>指令唯一id，该id由SMMS产生</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="basx" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>网站登记备案属性代码信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="basxXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="jrfs">
+					<xs:annotation>
+						<xs:documentation>建站方式代码信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="jrfsXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="dwsx">
+					<xs:annotation>
+						<xs:documentation>单位属性代码信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="dwsxXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="zjlx">
+					<xs:annotation>
+						<xs:documentation>证件类型代码信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="zjlxXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="jfxz">
+					<xs:annotation>
+						<xs:documentation>机房性质代码信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="jfxzXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="dllx">
+					<xs:annotation>
+						<xs:documentation>代理类型代码信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="dllxXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="fwnr">
+					<xs:annotation>
+						<xs:documentation>服务内容代码信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="fwnrXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="fl" type="xs:integer" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>当前属性所属的父类id，已经是父类节点的此处为空</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="gzlx">
+					<xs:annotation>
+						<xs:documentation>监测规则及过滤规则类型代码信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="gzlxXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="wfwgqk">
+					<xs:annotation>
+						<xs:documentation>违法违规情况信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="wfwgqkXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="urlcontent" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>域名子分类信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="urlcontentXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="fl" type="xs:integer" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>当前属性所属的父类id，已经是父类节点的此处为空</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="proapp" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>网络应用/协议信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="proappXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="type" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>类型：0——网络应用、1——网络协议</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="yyfwlx" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>应用服务类型信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="yyfwlxXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="qzsp" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>前置审批信息</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="qzspXx" maxOccurs="unbounded">
+								<xs:complexType>
+									<xs:sequence>
+										<xs:element name="id" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>代码</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="mc" type="xs:string">
+											<xs:annotation>
+												<xs:documentation>当前代码对应的属性值</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="bz" type="xs:string" minOccurs="0">
+											<xs:annotation>
+												<xs:documentation>备注</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+										<xs:element name="sfyx" type="xs:integer">
+											<xs:annotation>
+												<xs:documentation>0——无效、1——有效</xs:documentation>
+											</xs:annotation>
+										</xs:element>
+									</xs:sequence>
+								</xs:complexType>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="timeStamp" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>生成时间</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

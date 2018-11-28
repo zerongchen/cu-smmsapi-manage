@@ -1,0 +1,145 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.aotain.common.config.LocalConfig;
+import com.aotain.common.utils.kafka.KafkaProducer;
+import com.aotain.cu.serviceapi.model.HouseInformation;
+import com.aotain.cu.serviceapi.model.IdcInformation;
+import com.aotain.cu.serviceapi.model.UserInformation;
+import com.aotain.smmsapi.task.constant.DealActConstant;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateIdcDao;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateIdc;
+import com.aotain.smmsapi.task.quartz.impl.DealResultServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class PreValidateIdcImpl implements PreValidateIdc{
+
+    private static Logger logger = LoggerFactory.getLogger(DealResultServiceImpl.class);
+
+    @Autowired
+    private PreValidateIdcDao preValidateIdcDao;
+
+    @Override
+    public void handleValidateIdc() {
+        try {
+            List<IdcInformation> idcInformations = preValidateIdcDao.getValidateIdcList(new IdcInformation());
+            if(idcInformations!=null && !idcInformations.isEmpty()){
+                for (IdcInformation idcInformation:idcInformations){
+                    handIncInfo(idcInformation);
+                }
+            }
+        }catch (Exception e){
+            logger.error("handle validate JYZ error ",e);
+        }
+
+    }
+
+    public void handIncInfo(IdcInformation idcInformation){
+        if (idcInformation==null) return;
+        int jyzNum;
+        switch (idcInformation.getOperateType()){
+            //新增
+            case 1:
+                jyzNum = preValidateIdcDao.jyzNum(new IdcInformation());
+                if(jyzNum>0){
+                    //正式表存在经营者 核验失败 写数据库
+                    handVarifyFail(idcInformation);
+                }else {
+                    validateIdc(idcInformation);
+                }
+                break;
+            case 2:
+                //修改
+                IdcInformation info =  new IdcInformation();
+                info.setJyzId(idcInformation.getJyzId());
+                jyzNum = preValidateIdcDao.jyzNum(info);
+                if(jyzNum!=1){
+                    //正式表不存在经营者 核验失败 写数据库
+                    handVarifyFail(idcInformation);
+                }else {
+                    validateIdc(idcInformation);
+                }
+                break;
+            case 3:
+                //删除
+                IdcInformation paramInfo =  new IdcInformation();
+                paramInfo.setJyzId(idcInformation.getJyzId());
+                jyzNum = preValidateIdcDao.jyzNum(paramInfo);
+                if(jyzNum==1){
+                    //核验成功 -->提交上报
+                    handVarifyPass(idcInformation);
+                }else {
+                    //核验失败
+                    handVarifyFail(idcInformation);
+                }
+                break;
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED,rollbackFor = Exception.class)
+    public void validateIdc(IdcInformation idcInformation){
+
+        if (idcInformation.getReportType()==0){
+            //获取(上报审核中,未预审)机房主体列表
+            List<HouseInformation> houseInformations = idcInformation.getHouseList();
+            //获取(上报审核中,未预审)用户主体列表
+            List<UserInformation> userInformations = idcInformation.getUserList();
+            //机房或者用户为空 -->审核不通过
+            if ( (houseInformations==null || houseInformations.isEmpty())
+                    || (userInformations==null || userInformations.isEmpty())){
+                //核验失败 写数据库
+                handVarifyFail(idcInformation);
+            }else {
+                for (HouseInformation houseInformation:houseInformations){
+                    if(houseInformation.getDealFlag().intValue()== DealActConstant.UN_PRE_VARIFY.getDealFlag()){
+                        //未预审-->提交预审
+                        houseInformation.setDealFlag(DealActConstant.RPT_VARIFY.getDealFlag());
+                        preValidateIdcDao.submitHoset(houseInformation);
+                    }
+                }
+                for (UserInformation userInformation:userInformations){
+                    if (userInformation.getDealFlag().intValue()==DealActConstant.UN_PRE_VARIFY.getDealFlag()){
+                        //未预审-->提交预审
+                        userInformation.setDealFlag(DealActConstant.RPT_VARIFY.getDealFlag());
+                        preValidateIdcDao.submitUser(userInformation);
+                    }
+                }
+            }
+        }else if (idcInformation.getReportType()==1){
+            //单独上报
+            if(true){
+                //完整性核验 -->提交上报
+                handVarifyPass(idcInformation);
+            }else {
+                //核验失败
+                handVarifyFail(idcInformation);
+            }
+        }else {
+            //核验失败 写数据库
+            handVarifyFail(idcInformation);
+        }
+    }
+
+    public void handVarifyPass(IdcInformation idcInformation){
+        idcInformation.setDealFlag(DealActConstant.SUB_RPT.getDealFlag());
+        preValidateIdcDao.submitJyz(idcInformation);
+
+        //write kafka
+        Map<String, Object> conf = LocalConfig.getInstance().getKafkaProducerConf();
+        KafkaProducer producer = new KafkaProducer(conf);
+
+    }
+
+    public void handVarifyFail(IdcInformation idcInformation){
+        idcInformation.setDealFlag(DealActConstant.RPT_VARIFY_FAIL.getDealFlag());
+        preValidateIdcDao.submitJyz(idcInformation);
+    }
+}

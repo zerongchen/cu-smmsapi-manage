@@ -1,0 +1,39 @@
+package com.aotain.smmsapi.task.constant;
+
+
+public enum DealFlagConstant {
+
+    //（0-未预审、1-预审不通过、2-上报审核中、3-上报审核不通过、4-提交上报、5-上报成功、6-上报失败）
+    UN_PRE_VARIFY(0,"未预审"),
+    PRE_VARIFY_FAIL(1,"预审不通过"),
+    RPT_VARIFY(2,"上报审核中"),
+    RPT_VARIFY_FAIL(3,"上报审核不通过"),
+    SUB_RPT(4,"提交上报"),
+    RPT_SUCCESS(5,"上报成功"),
+    RPT_FAIL(6,"上报成功"),;
+
+    private int dealFlag;
+    private String dealDesc;
+
+
+    DealFlagConstant( int dealFlag, String dealDesc ) {
+        this.dealDesc=dealDesc;
+        this.dealFlag=dealFlag;
+    }
+
+    public int getDealFlag() {
+        return dealFlag;
+    }
+
+    public void setDealFlag( int dealFlag ) {
+        this.dealFlag = dealFlag;
+    }
+
+    public String getDealDesc() {
+        return dealDesc;
+    }
+
+    public void setDealDesc( String dealDesc ) {
+        this.dealDesc = dealDesc;
+    }
+}

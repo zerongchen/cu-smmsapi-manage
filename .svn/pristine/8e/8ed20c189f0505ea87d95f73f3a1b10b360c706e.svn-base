@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.smmsreturn.mapper.OperatorTablesDao">
+	<delete id="deleteJyz">
+		<if test="jyzId == null">
+			 delete from IDC_ISMS_BASE_IDC				where 1=0
+		</if>
+		<if test="jyzId != null">
+			begin
+			delete from IDC_ISMS_BASE_HOUSE_IPSEG		where houseid in(select houseid from IDC_ISMS_BASE_HOUSE WHERE jyzid=#{jyzId});
+			delete from IDC_ISMS_BASE_HOUSE_FRAME		where houseid in(select houseid from IDC_ISMS_BASE_HOUSE WHERE jyzid=#{jyzId});
+			delete from IDC_ISMS_BASE_HOUSE_GATEWAY		where houseid in(select houseid from IDC_ISMS_BASE_HOUSE WHERE jyzid=#{jyzId});
+			delete from IDC_ISMS_BASE_USER_FRAME		where houseid in(select houseid from IDC_ISMS_BASE_HOUSE WHERE jyzid=#{jyzId});
+			delete from IDC_ISMS_BASE_HOUSE				where jyzid=#{jyzId};
+		    delete from IDC_ISMS_BASE_USER_HH			where userid in(SELECT userId FROM IDC_ISMS_BASE_USER WHERE JYZID = 68);
+		    delete from IDC_ISMS_BASE_USER_SERVICE		where userid in(SELECT userId FROM IDC_ISMS_BASE_USER WHERE JYZID = 68);
+		    delete from IDC_ISMS_BASE_SERVICE_DOMAIN	where userid in(SELECT userId FROM IDC_ISMS_BASE_USER WHERE JYZID = 68);
+		    delete from IDC_ISMS_BASE_SERVICE_VIRTUAL	where userid in(SELECT userId FROM IDC_ISMS_BASE_USER WHERE JYZID = 68);
+		    delete from IDC_ISMS_BASE_USER				where jyzid=#{jyzId};
+		    delete from IDC_ISMS_BASE_IDC				where jyzid=#{jyzId};
+		    end;
+		</if>
+	</delete>
+	<sql id="houseIdList">
+		<if test="houseIdList == null or houseIdList.size() == 0">
+			-1
+		</if>
+		<if test="houseIdList != null and houseIdList.size() > 0">
+			<foreach collection="houseIdList" item="val" separator=",">
+				#{val}
+			</foreach>
+		</if>
+	</sql>
+	
+	<delete id="deleteHouses">
+		begin
+			delete from IDC_ISMS_BASE_HOUSE_IPSEG		where 1=0 and houseid in(<include refid="houseIdList"></include>);
+			delete from IDC_ISMS_BASE_HOUSE_FRAME		where 1=0 and houseid in(<include refid="houseIdList"></include>);
+			delete from IDC_ISMS_BASE_HOUSE_GATEWAY		where 1=0 and houseid in(<include refid="houseIdList"></include>);
+			delete from IDC_ISMS_BASE_USER_FRAME		where 1=0 and houseid in(<include refid="houseIdList"></include>);
+			delete from IDC_ISMS_BASE_HOUSE				where 1=0 and houseId in(<include refid="houseIdList"></include>);
+		end;
+	</delete>
+	
+	<sql id="userListStr">
+		<if test="userIdList == null or userIdList.size() == 0">
+			-1
+		</if>
+		<if test="userIdList != null and userIdList.size() > 0">
+			<foreach collection="userIdList" item="val" separator=",">
+				#{val}
+			</foreach>
+		</if>
+	</sql>
+	
+	<delete id="deleteUsers">
+		begin
+			delete from IDC_ISMS_BASE_USER_HH			where 1=0 and userid in(<include refid="userListStr"></include>);
+		    delete from IDC_ISMS_BASE_USER_SERVICE		where 1=0 and userid in(<include refid="userListStr"></include>);
+		    delete from IDC_ISMS_BASE_SERVICE_DOMAIN	where 1=0 and userid in(<include refid="userListStr"></include>);
+		    delete from IDC_ISMS_BASE_SERVICE_VIRTUAL	where 1=0 and userid in(<include refid="userListStr"></include>);
+		    delete from IDC_ISMS_BASE_USER				where 1=0 and userid in(<include refid="userListStr"></include>);
+		end;
+	</delete>
+</mapper>

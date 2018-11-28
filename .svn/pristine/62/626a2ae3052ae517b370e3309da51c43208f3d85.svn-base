@@ -1,0 +1,210 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.alibaba.fastjson.JSON;
+import com.aotain.common.config.LocalConfig;
+import com.aotain.common.utils.kafka.JobQueueUtil;
+import com.aotain.common.utils.kafka.KafkaProducer;
+import com.aotain.common.utils.model.msg.JobQueue;
+import com.aotain.common.utils.model.msg.RedisTaskStatus;
+import com.aotain.common.utils.model.smmscmd.CommandBaseVo;
+import com.aotain.common.utils.redis.TaskIdUtil;
+import com.aotain.common.utils.redis.TaskMessageUtil;
+import com.aotain.cu.serviceapi.model.HouseInformation;
+import com.aotain.cu.serviceapi.model.IdcInformation;
+import com.aotain.cu.serviceapi.model.UserInformation;
+import com.aotain.smmsapi.task.constant.DealFlagConstant;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreCommonDao;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateIdcDao;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateHouse;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateIdc;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateUser;
+import com.aotain.smmsapi.task.quartz.impl.DealResultServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class PreValidateIdcImpl implements PreValidateIdc{
+
+    private static Logger logger = LoggerFactory.getLogger(PreValidateIdcImpl.class);
+
+    @Autowired
+    private PreValidateIdcDao preValidateIdcDao;
+
+    @Autowired
+    private PreCommonDao preCommonDao;
+
+    @Autowired
+    private PreValidateUser preValidateUser;
+
+    @Autowired
+    private PreValidateHouse preValidateHouse;
+
+    @Override
+    public void handleValidateIdc() {
+        try {
+            List<IdcInformation> idcInformations = preValidateIdcDao.getValidateIdcList(new IdcInformation());
+            if(idcInformations!=null && !idcInformations.isEmpty()){
+                for (IdcInformation idcInformation:idcInformations){
+                    handIncInfo(idcInformation);
+                }
+            }
+        }catch (Exception e){
+            logger.error("handle validate JYZ error ",e);
+        }
+
+    }
+
+    public void handIncInfo(IdcInformation idcInformation){
+        if (idcInformation==null) return;
+        int jyzNum;
+        switch (idcInformation.getOperateType()){
+            //新增
+            case 1:
+                IdcInformation information = new IdcInformation();
+                information.setIdcName(idcInformation.getIdcName());
+                information.setIdcId(idcInformation.getIdcId());
+                jyzNum = preValidateIdcDao.jyzNum(information);
+                if(jyzNum>0){
+                    //正式表存在经营者 核验失败 写数据库
+                    idcInformation.setVerificationResult("正式表已经存在经营者");
+                    handVarifyFail(idcInformation);
+                }else {
+                    validateIdc(idcInformation);
+                }
+                break;
+            case 2:
+                //修改
+                IdcInformation info =  new IdcInformation();
+                info.setJyzId(idcInformation.getJyzId());
+                jyzNum = preValidateIdcDao.jyzNum(info);
+                if(jyzNum!=1){
+                    //正式表不存在经营者 核验失败 写数据库
+                    idcInformation.setVerificationResult("正式表不存在该经营者");
+                    handVarifyFail(idcInformation);
+                }else {
+                    validateIdc(idcInformation);
+                }
+                break;
+            case 3:
+                //删除
+                IdcInformation paramInfo =  new IdcInformation();
+                paramInfo.setJyzId(idcInformation.getJyzId());
+                jyzNum = preValidateIdcDao.jyzNum(paramInfo);
+                if(jyzNum==1){
+                    //核验成功 -->提交上报
+                    handVarifyPass(idcInformation);
+                }else {
+                    //核验失败
+                    idcInformation.setVerificationResult("正式表不存在该经营者");
+                    handVarifyFail(idcInformation);
+                }
+                break;
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED,rollbackFor = Exception.class)
+    public void validateIdc(IdcInformation idcInformation){
+
+        if (idcInformation.getReportType()==0){
+            //获取(上报审核中,未预审)机房主体列表
+            List<HouseInformation> houseInformations = idcInformation.getHouseList();
+            //获取(上报审核中,未预审)用户主体列表
+            List<UserInformation> userInformations = idcInformation.getUserList();
+            //机房或者用户为空 -->审核不通过
+            if ( (houseInformations==null || houseInformations.isEmpty())
+                    || (userInformations==null || userInformations.isEmpty())){
+                //机房或者用户为空,直接提交经营者预审
+                handVarifyFail(idcInformation);
+            }else {
+                boolean flag = false;
+
+                //待整改
+                for (HouseInformation houseInformation:houseInformations){
+                    if(houseInformation.getDealFlag().intValue()== DealFlagConstant.UN_PRE_VARIFY.getDealFlag()){
+                        //未预审-->提交预审
+                        houseInformation.setDealFlag(DealFlagConstant.RPT_VARIFY.getDealFlag());
+                        preValidateIdcDao.submitHoset(houseInformation);
+                        flag=true;
+                    }
+                }
+                for (UserInformation userInformation:userInformations){
+                    if (userInformation.getDealFlag().intValue()== DealFlagConstant.UN_PRE_VARIFY.getDealFlag()){
+                        //未预审-->提交预审
+                        userInformation.setDealFlag(DealFlagConstant.RPT_VARIFY.getDealFlag());
+                        preValidateIdcDao.submitUser(userInformation);
+                        flag=true;
+                    }
+                }
+                if (!flag){
+                    idcInformation.setVerificationResult("级联预审中，机房或者用户都已经提交预审");
+                    handVarifyFail(idcInformation);
+                    preValidateIdcDao.submitJyz(idcInformation);
+                }
+            }
+        }else if (idcInformation.getReportType()==1){
+            //单独上报
+            if(true){
+                //完整性核验(暂无) -->提交上报
+                handVarifyPass(idcInformation);
+            }else {
+                //核验失败
+                idcInformation.setVerificationResult("不完整");
+                handVarifyFail(idcInformation);
+            }
+        }else {
+            //核验失败 写数据库
+            idcInformation.setVerificationResult("上报类型有误");
+            handVarifyFail(idcInformation);
+        }
+    }
+
+    public void handVarifyPass(IdcInformation idcInformation){
+        idcInformation.setDealFlag(DealFlagConstant.SUB_RPT.getDealFlag());
+        preValidateIdcDao.submitJyz(idcInformation);
+
+        //submitId 从何处来
+        idcInformation.setSubmitId(0l);
+        //写记录表
+        preCommonDao.writeLog(idcInformation);
+
+        //写上报等待表
+        idcInformation.setCreateTime(new Date());
+        idcInformation.setUpdateTime(new Date());
+        preValidateIdcDao.writeIdcLog(idcInformation);
+
+        //write kafka
+        JobQueue jobQueue = new JobQueue();
+        //param 是 submitId
+        jobQueue.setParams(String.valueOf(idcInformation.getSubmitId()));
+        RedisTaskStatus redisTaskStatus = new RedisTaskStatus();
+        Long taskId = TaskIdUtil.getInstance().getTaskId();
+        jobQueue.setTaskid(taskId);
+        jobQueue.setToptaskid(taskId);
+        jobQueue.setIsretry(0);
+        jobQueue.setCreatetime(System.currentTimeMillis()/1000);
+        JobQueueUtil.sendMsgToKafkaJobQueue(jobQueue);
+        // 写入redis任务信息hash
+        redisTaskStatus.setToptaskid(taskId);
+        redisTaskStatus.setTaskid(taskId);
+        redisTaskStatus.setTasktype(1); // JOB任务
+        redisTaskStatus.setContent(JSON.toJSONString(jobQueue));
+        redisTaskStatus.setCreatetime(System.currentTimeMillis()/1000);
+        redisTaskStatus.setStatus(1); // 开始
+        redisTaskStatus.setTimes(1);  // 从1开始
+        TaskMessageUtil.getInstance().setTask(taskId, redisTaskStatus);
+    }
+
+    public void handVarifyFail(IdcInformation idcInformation){
+        idcInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+        preValidateIdcDao.submitJyz(idcInformation);
+
+    }
+}

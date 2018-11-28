@@ -1,0 +1,289 @@
+package com.aotain.smmsapi.task.quartz.impl;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.net.ftp.FTPClient;
+import org.apache.commons.net.ftp.FTPFile;
+import org.apache.commons.net.ftp.FTPFileFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+
+import com.alibaba.fastjson.JSON;
+import com.aotain.common.config.ContextUtil;
+import com.aotain.common.config.LocalConfig;
+import com.aotain.common.config.redis.BaseRedisService;
+import com.aotain.common.utils.model.msg.FileUploadInfo;
+import com.aotain.common.utils.model.msg.RedisTaskStatus;
+import com.aotain.common.utils.monitorstatistics.ModuleConstant;
+import com.aotain.common.utils.redis.TaskMessageUtil;
+import com.aotain.common.utils.tools.MonitorStatisticsUtils;
+import com.aotain.smmsapi.task.QuartzMain;
+import com.aotain.smmsapi.task.constant.GlobalParams;
+import com.aotain.smmsapi.task.logStatus.service.LogReportService;
+import com.aotain.smmsapi.task.quartz.DealResultService;
+import com.aotain.smmsapi.task.utils.StringUtil;
+
+@Component
+@Service(value = "baseIDCWebService")
+public class DealResultServiceImpl implements DealResultService {
+	private static Logger log = LoggerFactory.getLogger(DealResultServiceImpl.class);
+
+	@Autowired
+	private LogReportService logReportService;
+	
+	public void dealSmmsProcessResult() {
+		if (QuartzMain.LSELECTOR == null || !QuartzMain.LSELECTOR.getLeader()) {
+			log.debug("service node(" + QuartzMain.SERVICE_NODE_NAME + ") is sleeping ...");
+			return;
+		} else {
+			log.info("service node(" + QuartzMain.SERVICE_NODE_NAME + ") is working ...");
+		}
+		log.info("create smms process result tasks .");
+		try {
+			String ufpath = (String) com.aotain.common.config.LocalConfig.getInstance()
+					.getHashValueByHashKey(GlobalParams.UPLOAD_FILE_PATH);
+			String ufbakpath = (String) com.aotain.common.config.LocalConfig.getInstance()
+					.getHashValueByHashKey(GlobalParams.UPLOAD_FILE_BAK_PATH);
+			String ftpwpath = (String) com.aotain.common.config.LocalConfig.getInstance()
+					.getHashValueByHashKey(GlobalParams.FTP_PATH);
+			String ftpip = (String) com.aotain.common.config.LocalConfig.getInstance()
+					.getHashValueByHashKey(GlobalParams.FTP_IP);
+			String ftpport = (String) com.aotain.common.config.LocalConfig.getInstance()
+					.getHashValueByHashKey(GlobalParams.FTP_PORT);
+			String ftpusr = (String) com.aotain.common.config.LocalConfig.getInstance()
+					.getHashValueByHashKey(GlobalParams.FTP_USER);
+			String ftppwd = (String) com.aotain.common.config.LocalConfig.getInstance()
+					.getHashValueByHashKey(GlobalParams.FTP_PASSWORD);
+			String uploadFilePath = ufpath;
+			String uploadFileBakPath = ufbakpath;
+			String ftpWorkPath = ftpwpath;
+			if (!uploadFilePath.endsWith(File.separator)) {
+				uploadFilePath = uploadFilePath + File.separator;
+			}
+			if (!uploadFileBakPath.endsWith(File.separator)) {
+				uploadFileBakPath = uploadFileBakPath + File.separator;
+			}
+			if (!ftpWorkPath.endsWith(File.separator)) {
+				ftpWorkPath = ftpWorkPath + "/";
+			}
+			int ftpPort = Integer.parseInt(ftpport);
+			// 登陆FTP服务器
+			FTPClient ftp = new FTPClient();
+			
+			try {
+				ftp.connect(ftpip, ftpPort);
+				ftp.login(ftpusr, ftppwd);// 登录
+				log.info("User " + ftpusr + " login " + ftpip + " server success!!");
+			} catch (Exception e1) {
+				log.error("User " + ftpusr + " login " + ftpip + " server failed!!");
+				MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ, e1);
+				return;
+			}
+			String remotePath = ftpWorkPath + "999/";
+			//处理999目录文件
+			dealDirectoryFiles(ftp, remotePath);
+			// 校验管局999文件
+			ftp.logout();
+		} catch (Exception e) {
+			log.error("smms 999 directory deal exception:", e);
+			MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ, e);
+		}
+	}
+
+	/**
+	 * 
+	 * 处理999目录文件，读取文件返回redis任务TaskId和文件处理结果集合
+	 * 
+	 * @author : songl
+	 * @since:2017年11月13日 下午6:54:31
+	 */
+	private void dealDirectoryFiles(FTPClient ftp, String remotePath) throws IOException {
+		Boolean flag = ftp.changeWorkingDirectory(remotePath);// 切换到999目录
+		if (flag) {
+			log.info("changeWorkingDirectory " + remotePath + "success...");
+		} else {
+			log.info("changeWorkingDirectory " + remotePath + "failed...");
+		}
+		//List<RedisTaskStatus> taskIdList = new ArrayList<RedisTaskStatus>();
+		RedisTaskStatus redisTaskStatus = null;
+		final BaseRedisService<String, String, String> rediscluster = ContextUtil.getContext().getBean("baseRedisServiceImpl",BaseRedisService.class);
+		String[] fileNames = null;
+		try {
+			FTPFile[] files = ftp.listFiles(".", new FTPFileFilter() {
+				@Override
+				public boolean accept(FTPFile file) {
+					if (file.isDirectory()) {
+						return false;
+					}
+					String result = rediscluster.getHash("deal_fileName", file.getName());
+					if(!StringUtils.isBlank(result)){
+						return false;
+					}
+					if (file.getName().matches(".*\\w+-\\w+-\\w+.*")) {
+						return true;
+					}
+					return false;
+				}
+			});
+			if (files != null) {
+				int i = 0;
+				fileNames = new String[files.length];
+				for (FTPFile fileName : files) {
+					fileNames[i++] = fileName.getName();
+				}
+			}
+
+			BufferedReader br = null;
+			StringBuilder dealContent = null;
+			InputStream ins = null;
+			FileUploadInfo fileUploadInfo = null;
+			if (fileNames != null && fileNames.length > 0) {
+				for (int i = 0; i < fileNames.length && i < 1000; i++) {
+					String fileName = fileNames[i];
+					
+					String result = rediscluster.getHash("deal_fileName", fileName);
+					/**
+					 * 如果该文件正在被其他线程处理则跳过,
+					 * 否则继续处理处理完后删除文件名在redis记录
+					 */
+					if(StringUtil.isEmptyString(result)){
+						log.info("deal file at 999 directory:" + fileName);
+						
+						//先将fileName 写入redis hash，以便不让其他线程处理
+						rediscluster.putHash("deal_fileName", fileName, "");
+						
+						fileName = fileName.substring(fileName.lastIndexOf(File.separator) + 1);
+						// 获取文件目录
+						ins = ftp.retrieveFileStream(fileName);
+						fileName = fileName.substring(fileName.lastIndexOf(File.separator) + 1);
+						br = new BufferedReader(new InputStreamReader(ins, "UTF-8"));
+						String line = "";
+						dealContent = new StringBuilder(150);
+						while ((line = br.readLine()) != null) {
+							dealContent.append(line);
+						}
+						if (ins != null) {
+							ins.close();
+							ftp.completePendingCommand();
+						}
+						br.close();
+						String[] param = fileName.split("-");
+
+						if (param.length >= 0 && param != null) {
+							String fName = param[1];// 返回的文件名+taskId
+							
+							if(fName.length()<10){
+								//存在文件名小于10位数的错误文件，暂时不作处理，redis的记录暂不删除，以便其他线程不会扫描到该文件
+								log.warn("Exist warning file :"+fName +" (fileName's length is less than 10)");
+								continue;
+							}
+							long taskId;
+							String[] dealResultArr = param[2].split("\\.");
+							Integer status = Integer.parseInt(dealResultArr[0]);// 文件处理状态
+							try {
+								taskId = Long.parseLong(fName.substring(fName.length() - 10, fName.length()));
+								
+								//日志上报回写状态
+								int returnStatu =0;
+								if(status!=0){
+									returnStatu =1;
+								}
+								logReportService.updateLogStatusByTaskId(taskId,returnStatu);
+							} catch (NumberFormatException e1) {
+								//将错误文件挪移
+								ftp.deleteFile(fileName);
+								//文件名也从redis hash中删除
+								rediscluster.removeHash("deal_fileName", fileName);
+								log.error("unknow file:"+fName);
+								MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ, e1);
+								continue;
+							}
+							
+							redisTaskStatus = TaskMessageUtil.getInstance().getTask(taskId);
+							if (redisTaskStatus == null) {// 超时查询,重新建立对象
+								redisTaskStatus = new RedisTaskStatus();
+								fileUploadInfo = new FileUploadInfo();
+								redisTaskStatus.setTaskid(taskId);
+								redisTaskStatus.setToptaskid(taskId);
+								redisTaskStatus.setTasktype(3);
+								redisTaskStatus.setCreatetime(System.currentTimeMillis() / 1000);
+								redisTaskStatus.setTimes(1);
+								String commandStr = (String) LocalConfig.getInstance().getHashValueByHashKey(GlobalParams.UPLOAD_SMMS_FILE_KEY);
+								initUploadTaskParams(redisTaskStatus, commandStr);
+								
+								fName+=".xml";
+								fileUploadInfo.setFilename(fName);// 文件名
+							} else {
+								// 防止toptaskid为0，导致message入库报错
+								if(redisTaskStatus.getToptaskid() == null || redisTaskStatus.getToptaskid()==0L){
+									redisTaskStatus.setToptaskid(redisTaskStatus.getTaskid());
+								}
+								String obString = redisTaskStatus.getContent();
+								fileUploadInfo = JSON.parseObject(obString,FileUploadInfo.class);
+							}
+
+							
+							/**
+							 * 处理文件信息
+							 */
+							fileUploadInfo.setStatus(status);// 文件状态
+							
+							fileUploadInfo.setDealresult(dealContent.toString());// 文件内容
+							
+							redisTaskStatus.setStatus(4);
+							redisTaskStatus.setContent(JSON.toJSONString(fileUploadInfo));
+
+							
+							// 删除相应文件
+							try {
+								ftp.deleteFile(fileName);
+								//删除文件成功则写入redis
+								TaskMessageUtil.getInstance().setTask(redisTaskStatus.getTaskid(), redisTaskStatus);
+								
+								//文件名也从redis hash中删除
+								rediscluster.removeHash("deal_fileName", fileName);
+								
+								log.info("delete filename:" + fileName + "success..");
+							} catch (Exception e) {
+								log.error("delete filename:" + fileName + "exception..", e);
+								MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ, e);
+							}
+							
+					}
+					
+					}
+				}
+			}
+		} catch (IOException e) {
+			log.error("read 999 directory failed" , e);
+			MonitorStatisticsUtils.addEvent(ModuleConstant.MODULE_SMMSAPI_TASK_QUARTZ, e);
+		}
+	}
+	
+	private void initUploadTaskParams(RedisTaskStatus redisTaskStatus, String commandStrs) {
+		String[] params = commandStrs.split(",");
+		redisTaskStatus.setMaxtimes(Integer.parseInt(params[0]));
+		redisTaskStatus.setExpiretime(Long.parseLong(params[1]));
+		redisTaskStatus.setInterval(Integer.parseInt(params[2]));
+	}
+	
+	public static void main(String[] args) {
+	
+		/*String obString = "{\"content\": {\"createtime\": 1516008001,\"filepath\": \"/home/at_dev/isms/isms_data/upload/7/2018-01-15/15160080010002387531.xml\",\"status\": -1,\"filename\":\"15160080010002387531.xml\",\"recordcount\": [1],\"ip\": \"192.168.50.201 \"},\"createip\": \"server-1/192.168.50.201\",\"createtime\": 1516008001,\"expiretime\": 0,\"interval\": 600,\"maxtimes\": 1,\"status\": 1,\"taskid\":2387531,\"tasktype\": 3,\"times\": 1,\"toptaskid\": 2387530}";
+		@SuppressWarnings("unused")
+		FileUploadInfo fileUploadInfo = JSON.parseObject(obString,FileUploadInfo.class);
+		*/
+	}
+
+}

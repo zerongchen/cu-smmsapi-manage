@@ -1,0 +1,80 @@
+package com.aotain.smmsapi.task.bean;
+
+/**
+ * 999返回文件Redis缓存对象记录
+ * 
+ * @author liuz@aotian.com
+ * @date 2018年8月23日 下午1:46:46
+ */
+public class SmmsResultCache {
+	private long taskId;
+	private String fileName;
+	private int status;
+	private int fileType;
+	private long reciveTime = System.currentTimeMillis() / 1000; // 接收时间 s
+	private long lastDealTime = 0; // 上次处理时间 s
+	private int dealTimes = 0; // 处理次数
+
+	public long getReciveTime() {
+		return reciveTime;
+	}
+
+	public void setReciveTime(long reciveTime) {
+		this.reciveTime = reciveTime;
+	}
+
+	public long getLastDealTime() {
+		return lastDealTime;
+	}
+
+	public void setLastDealTime(long lastDealTime) {
+		this.lastDealTime = lastDealTime;
+	}
+
+	public int getDealTimes() {
+		return dealTimes;
+	}
+
+	public void setDealTimes(int dealTimes) {
+		this.dealTimes = dealTimes;
+	}
+
+	public long getTaskId() {
+		return taskId;
+	}
+
+	public void setTaskId(long taskId) {
+		this.taskId = taskId;
+	}
+
+	public String getFileName() {
+		return fileName;
+	}
+
+	public void setFileName(String fileName) {
+		this.fileName = fileName;
+	}
+
+	public int getStatus() {
+		return status;
+	}
+
+	public void setStatus(int status) {
+		this.status = status;
+	}
+
+	public int getFileType() {
+		return fileType;
+	}
+
+	public void setFileType(int fileType) {
+		this.fileType = fileType;
+	}
+
+	@Override
+	public String toString() {
+		return "SmmsResultCache [taskId=" + taskId + ", fileName=" + fileName + ", status=" + status + ", fileType="
+				+ fileType + ", reciveTime=" + reciveTime + ", lastDealTime=" + lastDealTime + ", dealTimes="
+				+ dealTimes + "]";
+	}
+}

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	elementFormDefault="qualified" attributeFormDefault="unqualified">	
+	<xs:element name="command">
+		<xs:annotation>
+			<xs:documentation>指令信息</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="commandId" type="xs:long">
+					<xs:annotation>
+						<xs:documentation>信息安全管控指令唯一ID，该ID由SMMS产生</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="type" type="xs:integer">
+					<xs:annotation>
+						<xs:documentation>管理指令的类型： 1-监测指令 2-过滤指令</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="rule" maxOccurs="unbounded">
+					<xs:annotation>
+						<xs:documentation>规则类型</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="subtype" type="xs:integer">
+								<xs:annotation>
+									<xs:documentation>监测规则、过滤规则类型</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="valueStart" type="xs:string">
+								<xs:annotation>
+									<xs:documentation>规则类型为IP或端口类的情况下是规则内容的起始值，其他类型规则则直接是规则内容</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="valueEnd" type="xs:string" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>规则内容的结束值，仅在规则类型为IP或端口类的情况下有效</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="keywordRange" type="xs:integer" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>关键词规则的匹配范围： 0-正文标题及正文本身； 1-附件标题； 2-附件正文</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="action">
+					<xs:annotation>
+						<xs:documentation>处置</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="reason" type="xs:string">
+								<xs:annotation>
+									<xs:documentation>过滤原因仅对过滤规则有效，用于说明过滤的原因</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="log" type="xs:integer">
+								<xs:annotation>
+									<xs:documentation>是否对中标的网络数据进行记录：0-不记录；1-记录。</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="report" type="xs:integer">
+								<xs:annotation>
+									<xs:documentation>是否对中标的网络数据的日志记录进行上报：0-不上传；1-上传。</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="time">
+					<xs:annotation>
+						<xs:documentation>时间</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="effectTime" type="xs:string">
+								<xs:annotation>
+									<xs:documentation>生效时间，采用yyyy-MM-dd HH:mm:ss格式</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="expiredTime" type="xs:string">
+								<xs:annotation>
+									<xs:documentation>过期时间，采用yyyy-MM-dd HH:mm:ss格式</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="range" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>生效范围</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="idcId" type="xs:string" minOccurs="0">
+								<xs:annotation>
+									<xs:documentation>电信管理部门颁发的IDC/ISP许可证号</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="houseId" type="xs:long" minOccurs="0" maxOccurs="unbounded">
+								<xs:annotation>
+									<xs:documentation>机房ID</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="privilege">
+					<xs:annotation>
+						<xs:documentation>权限</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="owner" type="xs:string">
+								<xs:annotation>
+									<xs:documentation>下发指令的SMMS用户名</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+							<xs:element name="visible" type="xs:integer">
+								<xs:annotation>
+									<xs:documentation>该指令是否对：ISMS可读：0-不可读；1-可读。</xs:documentation>
+								</xs:annotation>
+							</xs:element>
+						</xs:sequence>
+					</xs:complexType>
+				</xs:element>
+				<xs:element name="operationType" type="xs:integer">
+					<xs:annotation>
+						<xs:documentation>对该记录的操作类型</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="level" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>规则优先级</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="timeStamp" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>生成该XML文件的时间戳</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	
+</xs:schema>

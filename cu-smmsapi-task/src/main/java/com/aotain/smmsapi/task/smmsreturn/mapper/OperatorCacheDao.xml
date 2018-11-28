@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.smmsreturn.mapper.OperatorCacheDao">
+	<resultMap type="com.aotain.smmsapi.task.bean.OperatorCache" id="operatorCacheMap">
+	    <result column="JYZ_ID" jdbcType="VARCHAR" property="jyzId" />
+	    <result column="HOUSE_ID" jdbcType="VARCHAR" property="houseId" />
+	    <result column="USER_ID" jdbcType="VARCHAR" property="userId" />
+	    <result column="CREATE_TIME" jdbcType="TIMESTAMP" property="createTime" />
+	    <result column="CREATE_USERID" jdbcType="DECIMAL" property="createUserId" />
+	</resultMap>
+
+	<select id="getOperatorCache" resultMap="operatorCacheMap">
+		SELECT * FROM Cache_Isms_Base_Info WHERE 1=0
+		<if test="jyzId != null and jyzId != ''">
+			OR instr(','||#{jyzId}||',', ','||jyz_id||',') > 0 
+		</if>
+		<if test="houseId != null and houseId != ''">
+			OR instr(','||#{houseId}||',', ','||house_id||',') > 0
+		</if>
+		<if test="userId != null and userId != ''">
+			OR instr(','||#{userId}||',', ','||user_id||',') > 0
+		</if>
+	</select>
+	
+	<delete id="deleteOperatorCacheByJyzId">
+		DELETE FROM Cache_Isms_Base_Info WHERE 1=0
+		<if test="jyzIds!=null">
+			<foreach collection="jyzIds" index="i" item="jyzId" open="OR JYZ_ID IN (" close=")" separator="union">
+				SELECT #{jyzId} FROM DUAL
+			</foreach>
+		</if>
+	</delete>
+	
+	<delete id="deleteOperatorCacheByHouseId">
+		DELETE FROM Cache_Isms_Base_Info WHERE 1=0
+		<if test="houseIds!=null">
+			<foreach collection="houseIds" index="i" item="houseId" open="OR HOUSE_ID IN (" close=")" separator="union">
+				SELECT #{houseId} FROM DUAL
+			</foreach>
+		</if>
+	</delete>
+	
+	<delete id="deleteOperatorCacheByUserId">
+		DELETE FROM Cache_Isms_Base_Info WHERE 1=0
+		<if test="userIds!=null">
+			<foreach collection="userIds" index="i" item="userId" open="OR USER_ID IN (" close=")" separator="union">
+				SELECT #{userId} FROM DUAL
+			</foreach>
+		</if>
+	</delete>
+</mapper>

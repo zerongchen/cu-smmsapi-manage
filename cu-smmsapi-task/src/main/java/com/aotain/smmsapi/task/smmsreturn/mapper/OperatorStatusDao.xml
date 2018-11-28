@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.smmsreturn.mapper.OperatorStatusDao">
+
+	<sql id="sql_update_message">
+		<if test="message != null and message != ''">
+			,verification_result=#{message}
+		</if>
+	</sql>
+
+	<update id="updateJyzDealFlag">
+		UPDATE IDC_ISMS_BASE_IDC SET deal_flag=#{dealFlag} <include refid="sql_update_message"></include> WHERE 1=0
+		<if test="jyzId!=null and jyzId!=''"> 
+			or jyzid in (${jyzId})
+		</if>
+	</update>
+	
+	<update id="updateHouseDealFlag">
+		UPDATE IDC_ISMS_BASE_HOUSE SET deal_flag=#{dealFlag} <include refid="sql_update_message"></include> WHERE 1=0
+		<if test="houseId!=null and houseId!=''"> 
+			or houseid in (${houseId})
+		</if>
+	</update>
+	
+	<update id="updateUserDealFlag">
+		UPDATE IDC_ISMS_BASE_USER SET deal_flag=#{dealFlag} <include refid="sql_update_message"></include> WHERE 1=0
+		<if test="userId!=null and userId!=''"> 
+			or userid in (${userId})
+		</if>
+	</update>
+	
+	<update id="updateHouseIpsegDealFlag">
+		UPDATE idc_isms_base_house_ipseg SET deal_flag=#{dealFlag} WHERE 1=0
+		<if test="ipsegIdList!=null and ipsegIdList.size > 0"> 
+			or (ipsegid in (
+				<foreach collection="ipsegIdList" item="id" separator=",">
+					#{id}
+				</foreach>
+			) and deal_flag=0)
+		</if>
+	</update>
+	
+	<update id="updateHouseFrameDealFlag">
+		UPDATE idc_isms_base_house_frame SET deal_flag=#{dealFlag} WHERE 1=0
+		<if test="frameIdList!=null and frameIdList.size > 0"> 
+			or (frameid in (
+				<foreach collection="frameIdList" item="id" separator=",">
+					#{id}
+				</foreach>
+			)  and deal_flag=0)
+		</if>
+	</update>
+	
+	<update id="updateHouseGatewayDealFlag">
+		UPDATE idc_isms_base_house_gateway SET deal_flag=#{dealFlag} WHERE 1=0
+		<if test="gatewayIdList!=null and gatewayIdList.size > 0"> 
+			or ( gatewayid in (
+				<foreach collection="gatewayIdList" item="id" separator=",">
+					#{id}
+				</foreach>
+			)  and deal_flag=0)
+		</if>
+	</update>
+	
+	<update id="updateUserServiceDealFlag">
+		UPDATE idc_isms_base_user_service SET deal_flag=#{dealFlag} WHERE 1=0
+		<if test="serviceIdList!=null and serviceIdList.size > 0"> 
+			or (serviceid in (
+				<foreach collection="serviceIdList" item="id" separator=",">
+					#{id}
+				</foreach>
+			)   and deal_flag=0)
+		</if>
+	</update>
+	
+	<update id="updateUserServiceDomainDealFlag">
+		UPDATE idc_ISMS_BASE_SERVICE_DOMAIN SET deal_flag=#{dealFlag} WHERE 1=0
+		<if test="domainIdList!=null and domainIdList.size > 0"> 
+			or (domainid in (
+				<foreach collection="domainIdList" item="id" separator=",">
+					#{id}
+				</foreach>
+			)   and deal_flag=0)
+		</if>
+	</update>
+	
+	<update id="updateUserHHDealFlag">
+		UPDATE idc_isms_base_user_hh SET deal_flag=#{dealFlag} WHERE 1=0
+		<if test="hhIdList!=null and hhIdList.size > 0"> 
+			or (hhid in (
+				<foreach collection="hhIdList" item="id" separator=",">
+					#{id}
+				</foreach>
+			)  and deal_flag=0)
+		</if>
+	</update>
+	
+	<update id="updateUserVirtualDealFlag">
+		UPDATE idc_isms_base_service_virtual SET deal_flag=#{dealFlag} WHERE 1=0
+		<if test="virtualIdList!=null and virtualIdList.size > 0"> 
+			or (VIRTUALID in (
+				<foreach collection="virtualIdList" item="id" separator=",">
+					#{id}
+				</foreach>
+			) and deal_flag=0)
+		</if>
+	</update>
+	
+	<delete id="deleteHouseIpsegByIds" parameterType="String">
+		delete from idc_isms_base_house_ipseg t where 1=0 
+		<if test="ids!=null and ids!=''">
+			or (t.ipsegid in (${ids}) and czlx=3)
+		</if>
+	</delete>
+	
+	<delete id="deleteHouseFrameByIds" parameterType="String">
+		delete from idc_isms_base_house_frame t where 1=0
+		<if test="ids!=null and ids!=''">
+			or (t.frameid in (${ids}) and czlx=3)
+		</if>
+	</delete>
+	<delete id="deleteHouseLinkByIds" parameterType="String">
+		delete from idc_isms_base_house_gateway t where 1=0
+		<if test="ids!=null and ids!=''">
+			or (t.gatewayid in (${ids}) and czlx=3)
+		</if>
+	</delete>
+	
+	<delete id="deleteUserServiceByIds" parameterType="String">
+		delete from idc_isms_base_user_service t where 1=0
+		<if test="ids!=null and ids!=''">
+			or (t.serviceid in (${ids}) and czlx=3)
+		</if>
+		 
+	</delete>
+	
+	<delete id="deleteBandWidthByIds" parameterType="String">
+		delete from idc_isms_base_user_hh t where 1=0
+		<if test="ids!=null and ids!=''">
+			or (t.hhid in (${ids}) and czlx=3)
+		</if>
+	</delete>
+	
+	<delete id="deletUserVirtualByIds" parameterType="String">
+		delete from idc_isms_base_service_virtual t where 1=0
+		<if test="ids!=null and ids!=''">
+			or (t.virtualid in (${ids}) and czlx=3)
+		</if>
+	</delete>
+	
+</mapper>

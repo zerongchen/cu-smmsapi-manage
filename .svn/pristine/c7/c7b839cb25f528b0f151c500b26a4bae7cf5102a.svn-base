@@ -1,0 +1,13 @@
+package com.aotain.smmsapi.task.prevalidate.service;
+
+import com.aotain.cu.serviceapi.model.HouseInformation;
+
+public interface PreValidateHouse {
+
+    /**
+     * 提交预审核验子流程-机房
+     */
+    public void handleValidateHouse();
+
+    public boolean handHouseInfo( HouseInformation houseInformation);
+}

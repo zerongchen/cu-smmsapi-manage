@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aotain.smmsapi.task.prevalidate.mapper.PreCommonDao">
+
+	<insert id="writeLog" parameterType="com.aotain.cu.serviceapi.model.BaseModel">
+		
+		<selectKey resultType="java.lang.Long" keyProperty="submitId" order="BEFORE">
+			SELECT SEQ_WAIT_SUBMIT_ID.nextval INTO submitId FROM dual
+		</selectKey>
+		INSERT INTO WAIT_ISMS_SUBMIT_REPORTLOG(SUBMIT_ID,DEAL_FLAG)VALUES (#{submitId},#{dealFlag})
+	</insert>
+
+</mapper>

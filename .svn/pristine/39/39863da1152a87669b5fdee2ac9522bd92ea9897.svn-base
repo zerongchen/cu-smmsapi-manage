@@ -1,0 +1,452 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.alibaba.fastjson.JSON;
+import com.aotain.common.config.LocalConfig;
+import com.aotain.common.utils.kafka.JobQueueUtil;
+import com.aotain.common.utils.model.msg.JobQueue;
+import com.aotain.common.utils.model.msg.RedisTaskStatus;
+import com.aotain.common.utils.redis.TaskIdUtil;
+import com.aotain.common.utils.redis.TaskMessageUtil;
+import com.aotain.cu.serviceapi.model.*;
+import com.aotain.cu.utils.ThreadLocalUtil;
+import com.aotain.smmsapi.task.constant.DealFlagConstant;
+import com.aotain.smmsapi.task.constant.GlobalParams;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreCommonDao;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateHouseDao;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateIdcDao;
+import com.aotain.smmsapi.task.prevalidate.mapper.PreValidateUserDao;
+import com.aotain.smmsapi.task.prevalidate.service.PreValidateIdc;
+import com.aotain.smmsapi.task.utils.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class PreValidateIdcImpl implements PreValidateIdc{
+
+	private static Logger logger = LoggerFactory.getLogger(PreValidateIdcImpl.class);
+
+	@Autowired
+	private PreValidateIdcDao preValidateIdcDao;
+	
+	@Autowired
+	private PreValidateHouseDao preValidateHouseDao;
+	
+	@Autowired
+	private PreValidateUserDao preValidateUserDao;
+	
+	@Autowired
+	private PreCommonDao preCommonDao;
+	
+	@Autowired
+	private PreValidateUserImpl preValidateUser;
+	
+	@Autowired
+	private PreValidateHouseImpl preValidateHouse;
+
+    /**
+     * 级联预审，单独预审，用户，机房预审的总入口
+     */
+	@Override
+	public void handleValidateIdc() {
+		try {
+			List<IdcInformation> idcInformations = preValidateIdcDao.getValidateIdcList(new IdcInformation());
+			if (idcInformations != null && !idcInformations.isEmpty()) {
+				for (IdcInformation idcInformation : idcInformations) {
+					if (idcInformation.getDealFlag().intValue() == DealFlagConstant.RPT_VARIFY.getDealFlag()) {
+						//经营者信息上报审核中，审核经营者信息是否能提交上报
+						logger.info("[DataValidate]validate the idc information starting......");
+						handIncInfo(idcInformation);
+						logger.info("[DataValidate]validate the idc information end......");
+					} else {
+						logger.info("[DataValidate]validate the house or user information starting......");
+						validateAndWrite(idcInformation, false);
+						logger.info("[DataValidate]validate the house or user information end......");
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("handle validate JYZ error ", e);
+		}
+	}
+
+    /**
+     * 验证机房和用户,成功的统一写库
+     * @param idcInformation
+     */
+	@Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+	public void validateAndWrite(IdcInformation idcInformation, boolean updateIdcVerRst) {
+
+		// 将经营者信息传给用户机房
+		preValidateUser.setIdcInformation(idcInformation);
+		preValidateHouse.setIdcInformation(idcInformation);
+		// 走机房用户校验的总入口
+		
+		logger.info("[DataValidate]validate the house information starting......");
+		preValidateHouse.handleValidateHouse();
+		logger.info("[DataValidate]validate the house information end......");
+
+
+		long houseSuccessCnt = ThreadLocalUtil.get("houseSuccessCnt") != null ? (long) ThreadLocalUtil.get("houseSuccessCnt") : 0;
+		long houseFailCnt = ThreadLocalUtil.get("houseTotalCnt") != null ? (long) ThreadLocalUtil.get("houseTotalCnt") - houseSuccessCnt : 0;
+		long userSuccessCnt = ThreadLocalUtil.get("userSuccessCnt") != null ? (long) ThreadLocalUtil.get("userSuccessCnt") : 0;
+		long userFailCnt = ThreadLocalUtil.get("userTotalCnt") != null ? (long) ThreadLocalUtil.get("userTotalCnt")-userSuccessCnt : 0;
+
+		if (updateIdcVerRst) {
+			idcInformation.setVerificationResultWithTimestamp(String.format("%s 机房信息已预审通过%s个，还有%s审核不通过！\r\n %s 用户信息已预审通过%s个，还有%s审核不通过！", DateUtils.getCurrentyyyMMddHHmmss(), houseSuccessCnt, houseFailCnt, DateUtils.getCurrentyyyMMddHHmmss(),userSuccessCnt, userFailCnt));
+			preCommonDao.writeLog(idcInformation);
+			handVarifyPass(idcInformation,true);
+		} else {
+			// 经营者没有提交预审
+			if (houseSuccessCnt > 0 || userSuccessCnt > 0) {  // 此处存在逻辑漏洞：成功数量并不代表需要创建job任务，再加一层判断
+				List<HouseInformation> houseInformationList = preValidateHouse.getHouseBatchConstructs();
+				List<UserInformation> userBatchConstructs = preValidateUser.getUserBatchConstructs();
+
+				// 只有存在需要上报的数据时，才需要创建job任务
+				if ((houseInformationList != null && houseInformationList.size() > 0)
+						|| (userBatchConstructs != null && userBatchConstructs.size() > 0)) {
+
+					preCommonDao.writeLog(idcInformation);
+					// 获取需要写库的用户和机房
+
+					if (!houseInformationList.isEmpty()) {
+						for (HouseInformation houseInformation : houseInformationList) {
+							houseInformation.setSubmitId(idcInformation.getSubmitId());
+							writeHouseSuccessLog(houseInformation);
+						}
+					}
+					if (!userBatchConstructs.isEmpty()) {
+						for (UserInformation userInformation : userBatchConstructs) {
+							userInformation.setSubmitId(idcInformation.getSubmitId());
+							writeUserSuccessLog(userInformation);
+						}
+					}
+					IdcInformation mation = new IdcInformation();
+					mation.setJyzId(idcInformation.getJyzId());
+					mation.setOperateType(idcInformation.getOperateType());
+					mation.setIdcId(idcInformation.getIdcId());
+					mation.setSubmitId(idcInformation.getSubmitId());
+					handVarifyPass(mation, false);
+				}
+			}
+		}
+          
+        logger.info("current pre validate finish ... ...");
+    }
+
+    /**
+     * 核验经营者
+     * @param idcInformation
+     */
+	public void handIncInfo(IdcInformation idcInformation) {
+		if (idcInformation == null) {
+			return;
+		}
+		if (idcInformation.getOperateType() == null) {
+			return;
+		}
+		int jyzNum;
+		switch (idcInformation.getOperateType()) {
+		// 新增
+		case 1:
+			logger.info("[DataValidate]The idc [" + idcInformation.getIdcName() + "] newly validate starting......");
+			IdcInformation information = new IdcInformation();
+			information.setIdcName(idcInformation.getIdcName());
+			information.setIdcId(idcInformation.getIdcId());
+			jyzNum = preValidateIdcDao.jyzNum(information);
+			if (jyzNum > 0) {
+				// 正式表存在经营者 核验失败 写数据库
+				idcInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" 上报表已经存在经营者[" + idcInformation.getIdcName() + "]");
+				handVarifyFail(idcInformation);
+			} else {
+				validateIdc(idcInformation);
+			}
+			logger.info("[DataValidate]The idc [" + idcInformation.getIdcName() + "] newly validate end.");
+			break;
+		case 2:
+			// 修改
+			logger.info("[DataValidate]The idc [" + idcInformation.getIdcName() + "] update validate starting......");
+			IdcInformation info = new IdcInformation();
+			info.setJyzId(idcInformation.getJyzId());
+			jyzNum = preValidateIdcDao.jyzNum(info);
+			if (jyzNum != 1) {
+				// 正式表不存在经营者 核验失败 写数据库
+				idcInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" 上报表不存在经营者[" + idcInformation.getIdcName() + "]");
+				handVarifyFail(idcInformation);
+			} else {
+				validateIdc(idcInformation);
+			}
+			logger.info("[DataValidate]The idc [" + idcInformation.getIdcName() + "] update validate end......");
+			break;
+		case 3:
+			// 删除
+			logger.info("[DataValidate]The idc [" + idcInformation.getIdcName() + "] delete validate starting......");
+			IdcInformation paramInfo = new IdcInformation();
+			paramInfo.setJyzId(idcInformation.getJyzId());
+			jyzNum = preValidateIdcDao.jyzNum(paramInfo);
+			if (jyzNum == 1) {
+				// 核验成功 -->提交上报
+				validateIdc(idcInformation);
+			} else {
+				// 核验失败
+				idcInformation.setVerificationResultWithTimestamp(DateUtils.getCurrentyyyMMddHHmmss() +" 上报表不存在经营者[" + idcInformation.getIdcName() + "]");
+				handVarifyFail(idcInformation);
+			}
+			logger.info("[DataValidate]The idc [" + idcInformation.getIdcName() + "] delete validate end.");
+			break;
+		}
+	}
+
+    @Transactional(propagation = Propagation.REQUIRED,rollbackFor = Exception.class)
+    public void validateIdc(IdcInformation idcInformation){
+//        if (idcInformation.getReportType()!=null && idcInformation.getReportType()==0){
+            //获取(上报审核中)机房主体列表
+            List<HouseInformation> houseInformations = idcInformation.getHouseList();
+            //获取(上报审核中)用户主体列表
+            List<UserInformation> userInformations = idcInformation.getUserList();
+            //机房或者用户为空 -->审核通过
+		if ((houseInformations == null || houseInformations.isEmpty()) && (userInformations == null || userInformations.isEmpty())) {
+			// 机房或者用户为空,直接提交经营者预审
+			preCommonDao.writeLog(idcInformation);
+			handVarifyPass(idcInformation,true);
+		} else {
+			validateAndWrite(idcInformation, true);
+		}
+
+    }
+
+    public void handVarifyPass(IdcInformation idcInformation,boolean updateIdc){
+
+    	if (updateIdc) {
+			idcInformation.setDealFlag(DealFlagConstant.SUB_RPT.getDealFlag());
+			preValidateIdcDao.submitJyz(idcInformation);
+			idcInformation.setCreateTime(new Date());
+			idcInformation.setUpdateTime(new Date());
+		}
+// 		必须先写log，后写等待表
+//        preCommonDao.writeLog(idcInformation);
+
+        //写上报等待表
+        preValidateIdcDao.writeIdcLog(idcInformation);
+
+        //write kafka
+        JobQueue jobQueue = new JobQueue();
+        //param 是 submitId
+        Map<String ,Long> map=new HashMap<String ,Long>();
+        map.put("submitId",idcInformation.getSubmitId());
+        jobQueue.setParams(JSON.toJSONString(map));
+        RedisTaskStatus redisTaskStatus = new RedisTaskStatus();
+        Long taskId = TaskIdUtil.getInstance().getTaskId();
+        jobQueue.setJobtype(GlobalParams.UPLOAD_BASIC_DATTA_RPT);
+        jobQueue.setTaskid(taskId);
+        jobQueue.setToptaskid(0l);
+        jobQueue.setIsretry(0);
+        jobQueue.setCreatetime(System.currentTimeMillis()/1000);
+        JobQueueUtil.sendMsgToKafkaJobQueue(jobQueue);
+        // 写入redis任务信息hash
+        redisTaskStatus.setToptaskid(0L);
+        redisTaskStatus.setTaskid(taskId);
+        redisTaskStatus.setTasktype(1); // JOB任务
+        redisTaskStatus.setContent(JSON.toJSONString(jobQueue));
+        redisTaskStatus.setCreatetime(System.currentTimeMillis()/1000);
+        String commandStr = (String) LocalConfig.getInstance().getHashValueByHashKey(GlobalParams.SUBMIT_REPORT_DATA);
+        String[] params = commandStr.split(",");
+		redisTaskStatus.setMaxtimes(Integer.parseInt(params[0]));
+		redisTaskStatus.setExpiretime(Long.parseLong(params[1]));
+		redisTaskStatus.setInterval(Integer.parseInt(params[2]));
+        redisTaskStatus.setStatus(1); // 开始
+        redisTaskStatus.setTimes(1);  // 从1开始
+        TaskMessageUtil.getInstance().setTask(taskId, redisTaskStatus);
+
+    }
+
+    /**
+     * 机房主体写等待表
+     * @param houseInformation
+     * @return
+     */
+    public DealFlagConstant.StatusEnum writeHouseSuccessLog( HouseInformation houseInformation){
+        //写操作表
+        houseInformation.setDealFlag(DealFlagConstant.SUB_RPT.getDealFlag());
+        preValidateHouseDao.submitHouse(houseInformation);
+
+        //写记录表
+//        preCommonDao.writeLog(houseInformation);
+        //写等待表---主表
+        preValidateHouseDao.writeHouseLog(houseInformation);
+        //写等待表---IP地址信息表
+        List<HouseIPSegmentInformation> ips = houseInformation.getIpSegList();
+        if (ips!=null && ips.size()>0){
+            for (HouseIPSegmentInformation ipSegmentInformation:ips){
+                ipSegmentInformation.setSubmitId(houseInformation.getSubmitId());
+                ipSegmentInformation.setHouseseqId(houseInformation.getHouseseqId());
+                updateCzlx(ipSegmentInformation);
+                preValidateHouseDao.writeHouseIpLog(ipSegmentInformation);
+               // ipSegmentInformation.setDealFlag(DealFlagConstant.SUB_RPT.getDealFlag());
+                preValidateHouseDao.submitHouseIpseg(ipSegmentInformation);
+            }
+        }
+        //写等待表---机架表
+        List<HouseFrameInformation> frams = houseInformation.getFrameList();
+        if (frams!=null && frams.size()>0){
+            for (HouseFrameInformation frameInformation:frams){
+                frameInformation.setSubmitId(houseInformation.getSubmitId());
+                frameInformation.setHouseseqId(houseInformation.getHouseseqId());
+                updateCzlx(frameInformation);
+                preValidateHouseDao.writeHouseFrameLog(frameInformation);
+//                frameInformation.setDealFlag(DealFlagConstant.ChildDealFlagEum.UN_UPLOAD.getValue());
+                preValidateHouseDao.submitHouseFrame(frameInformation);
+            }
+        }
+        //写等待表---机架用户表
+        List<HouseUserFrameInformation> userFrams = houseInformation.getUserFrameList();
+        if (userFrams!=null && userFrams.size()>0){
+            for (HouseUserFrameInformation userFrameInformation:userFrams){
+                userFrameInformation.setHouseseqId(houseInformation.getHouseseqId());
+                preValidateHouseDao.writeHouseUserFrameLog(userFrameInformation);
+            }
+        }
+
+        //写等待表---机架链路表
+        List<HouseGatewayInformation> gatewayInfoList = houseInformation.getGatewayInfoList();
+        if (gatewayInfoList!=null && gatewayInfoList.size()>0){
+            for (HouseGatewayInformation houseGatewayInformation:gatewayInfoList){
+                houseGatewayInformation.setHouseseqId(houseInformation.getHouseseqId());
+                updateCzlx(houseGatewayInformation);
+                preValidateHouseDao.writeHouseGatewayLog(houseGatewayInformation);
+//                houseGatewayInformation.setDealFlag(DealFlagConstant.ChildDealFlagEum.UN_UPLOAD.getValue());
+                preValidateHouseDao.submitHouseGateway(houseGatewayInformation);
+            }
+        }
+        return DealFlagConstant.StatusEnum.SUCCESS;
+    }
+
+    /**
+     * 用户子节点的数据状态为：新增，已上报时，操作状态改成更新
+     * （等待表没有处理状态字段，避免写上报表时重复执行子节点的新增操作）
+     * @param info
+     */
+    private void updateCzlx(Object info) {
+    	if(info instanceof HouseGatewayInformation){
+    		HouseGatewayInformation in = (HouseGatewayInformation) info;
+    		// 新增已上报的，改成修改后进行上报
+    		if(in.getOperateType() == 1 && in.getDealFlag() == 1){
+    			in.setOperateType(2);
+    		}
+    	}else if(info instanceof HouseFrameInformation){
+    		HouseFrameInformation in = (HouseFrameInformation) info;
+    		// 新增已上报的，改成修改后进行上报
+    		if(in.getOperateType() == 1 && in.getDealFlag() == 1){
+    			in.setOperateType(2);
+    		}
+    	}else if(info instanceof HouseIPSegmentInformation){
+    		HouseIPSegmentInformation in = (HouseIPSegmentInformation) info;
+    		// 新增已上报的，改成修改后进行上报
+    		if(in.getOperateType() == 1 && in.getDealFlag() == 1){
+    			in.setOperateType(2);
+    		}
+    	}else if(info instanceof UserVirtualInformation){
+    		UserVirtualInformation in = (UserVirtualInformation) info;
+    		// 新增已上报的，改成修改后进行上报
+    		if(in.getOperateType() == 1 && in.getDealFlag() == 1){
+    			in.setOperateType(2);
+    		}
+    	}else if(info instanceof ServiceDomainInformation){
+    		ServiceDomainInformation in = (ServiceDomainInformation) info;
+    		// 新增已上报的，改成修改后进行上报
+    		if(in.getOperateType() == 1 && in.getDealFlag() == 1){
+    			in.setOperateType(2);
+    		}
+    	}else if(info instanceof UserServiceInformation){
+    		UserServiceInformation in = (UserServiceInformation) info;
+    		// 新增已上报的，改成修改后进行上报
+    		if(in.getOperateType() == 1 && in.getDealFlag() == 1){
+    			in.setOperateType(2);
+    		}
+    	}else if(info instanceof UserBandwidthInformation){
+    		UserBandwidthInformation in = (UserBandwidthInformation) info;
+    		// 新增已上报的，改成修改后进行上报
+    		if(in.getOperateType() == 1 && in.getDealFlag() == 1){
+    			in.setOperateType(2);
+    		}
+    	}
+	}
+
+	/**
+     * 处理成功上报的用户，写等待表
+     * @param userInformation
+     */
+    public void writeUserSuccessLog( UserInformation userInformation){
+        //更新操作表状态
+        userInformation.setDealFlag(DealFlagConstant.SUB_RPT.getDealFlag());
+        preValidateUserDao.submitUser(userInformation);
+
+        //写记录表
+//        preCommonDao.writeLog(userInformation);
+        //写等待上报表--主体
+        preValidateUserDao.writeUserLog(userInformation);
+        //写等待上报表--带宽
+        List<UserBandwidthInformation> bands = userInformation.getBandwidthList();
+        if(bands!=null && !bands.isEmpty()){
+            for (UserBandwidthInformation bandwidthInformation:bands){
+                bandwidthInformation.setUserSeqId(userInformation.getUserSeqId());
+                updateCzlx(bandwidthInformation);
+                preValidateUserDao.writeUserBandLog(bandwidthInformation);
+//                bandwidthInformation.setDealFlag(DealFlagConstant.ChildDealFlagEum.UN_UPLOAD.getValue());
+                preValidateUserDao.submitUserBand(bandwidthInformation);
+            }
+        }
+        //写等待上报表--服务 && 服务域名
+        List<UserServiceInformation> services = userInformation.getServiceList();
+        if(services!=null && !services.isEmpty()){
+            for (UserServiceInformation userServiceInformation:services){
+                userServiceInformation.setUserSeqId(userInformation.getUserSeqId());
+                updateCzlx(userServiceInformation);
+                preValidateUserDao.writeUserServiceLog(userServiceInformation);
+//                userServiceInformation.setDealFlag(DealFlagConstant.ChildDealFlagEum.UN_UPLOAD.getValue());
+                preValidateUserDao.submitUserService(userServiceInformation);
+
+                List<ServiceDomainInformation> domins = userServiceInformation.getDomainList();
+                if (domins!=null && !domins.isEmpty()){
+                    for (ServiceDomainInformation serviceDomainInformation:domins){
+                        serviceDomainInformation.setUserSeqId(userInformation.getUserSeqId());
+                        updateCzlx(userServiceInformation);
+                        preValidateUserDao.writeUserServiceDomainLog(serviceDomainInformation);
+//                        serviceDomainInformation.setDealFlag(DealFlagConstant.ChildDealFlagEum.UN_UPLOAD.getValue());
+                        preValidateUserDao.submitUserServiceDomain(serviceDomainInformation);
+                    }
+                }
+            }
+        }
+        //写等待上报表--虚拟主机
+        List<UserVirtualInformation> virtualLists = userInformation.getVirtualList();
+        if(virtualLists!=null && !virtualLists.isEmpty()){
+            for (UserVirtualInformation virtualInformation:virtualLists){
+                virtualInformation.setUserSeqId(userInformation.getUserSeqId());
+                updateCzlx(virtualInformation);
+                preValidateUserDao.writeUserVirtualLog(virtualInformation);
+//                virtualInformation.setDealFlag(DealFlagConstant.ChildDealFlagEum.UN_UPLOAD.getValue());
+                preValidateUserDao.submitUserVirtual(virtualInformation);
+            }
+        }
+    }
+
+    /**
+     * 处理失败的经营者
+     * @param idcInformation
+     */
+    public void handVarifyFail(IdcInformation idcInformation){
+        idcInformation.setDealFlag(DealFlagConstant.RPT_VARIFY_FAIL.getDealFlag());
+        preValidateIdcDao.submitJyz(idcInformation);
+    }
+
+
+}

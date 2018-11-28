@@ -1,0 +1,118 @@
+package com.aotain.smmsapi.task.smmsreturn.mapper;
+
+import java.util.List;
+
+import org.apache.ibatis.annotations.Param;
+
+import com.aotain.common.config.annotation.MyBatisDao;
+
+/**
+ * 经营者操作表数据库操作接口
+ * 
+ * @author liuz@aotian.com
+ * @date 2018年8月22日 上午11:06:09
+ */
+@MyBatisDao
+public interface OperatorStatusDao {
+	/**
+	 * 更新处理状态
+	 * @param jyzId 
+	 * @param dealFlag 处理标记（0-未预审、1-预审不通过、2-上报审核中、3-上报审核不通过、4-提交上报、5-上报成功、6-上报失败）
+	 * @return
+	 */
+	public int updateJyzDealFlag(@Param("jyzId")String jyzId,@Param("dealFlag")int dealFlag,@Param("message") String message);
+
+	/**
+	 * 更新机房处理状态
+	 * @param houseId
+	 * @param dealFlag
+	 * @return
+	 */
+	public int updateHouseDealFlag(@Param("houseId")String houseId, @Param("dealFlag")int dealFlag,@Param("message") String message);
+
+	/**
+	 * 更新用户处理状态
+	 * @param userId
+	 * @param dealFlag
+	 * @return
+	 */
+	public int updateUserDealFlag(@Param("userId")String userId, @Param("dealFlag")int dealFlag,@Param("message") String message);
+
+	/**
+	 * 更新机房IP段上报状态
+	 * @param ipsegIdList
+	 * @param dealFlag 0 - 未上报，1 - 已上报
+	 */
+	public int updateHouseIpsegDealFlag(@Param("ipsegIdList")List<Long> ipsegIdList, @Param("dealFlag")int dealFlag);
+
+	/**
+	 * 更新机房机架上报状态
+	 * @param frameIdList
+	 * @param dealFlag  0 - 未上报，1 - 已上报
+	 */
+	public int updateHouseFrameDealFlag(@Param("frameIdList")List<Long> frameIdList, @Param("dealFlag")int dealFlag);
+
+	/**
+	 * 更新机房链路上报状态
+	 * @param gatewayIdList
+	 * @param dealFlag  0 - 未上报，1 - 已上报
+	 */
+	public int updateHouseGatewayDealFlag(@Param("gatewayIdList")List<Long> gatewayIdList, @Param("dealFlag")int dealFlag);
+
+	/**
+	 * 更新用户服务上报状态
+	 * @param serviceIdList
+	 * @param dealFlag  0 - 未上报，1 - 已上报
+	 */
+	public int updateUserServiceDealFlag(@Param("serviceIdList")List<Long> serviceIdList, @Param("dealFlag")int dealFlag);
+
+	/**
+	 * 更新用户带宽上报状态
+	 * @param hhIdList
+	 * @param dealFlag  0 - 未上报，1 - 已上报
+	 */
+	public int updateUserHHDealFlag(@Param("hhIdList")List<Long> hhIdList, @Param("dealFlag")int dealFlag);
+
+	/**
+	 * 更新用户带宽上报状态
+	 * @param virtualIdList
+	 * @param dealFlag  0 - 未上报，1 - 已上报
+	 */
+	public int updateUserVirtualDealFlag(@Param("virtualIdList")List<Long> virtualIdList, @Param("dealFlag")int dealFlag);
+
+	/**
+	 * 删除操作表机房IP地址段信息
+	 * 
+	 */
+	public int deleteHouseIpsegByIds(@Param("ids")String ids);
+	
+	/**
+	 * 删除操作表机房机架信息
+	 * 
+	 */
+	public int deleteHouseFrameByIds(@Param("ids")String ids);
+	
+	/**
+	 * 删除操作表机房链路信息
+	 * 
+	 */
+	public int deleteHouseLinkByIds(@Param("ids")String ids);
+	
+	/**
+	 * 删除操作表用户服务信息
+	 * 
+	 */
+	public int deleteUserServiceByIds(@Param("ids")String ids);
+
+	/**
+	 * 删除操作表用户带宽信息
+	 * 
+	 */
+	public int deleteBandWidthByIds(@Param("ids")String ids);
+
+	/**
+	 * 删除操作表用户虚拟主机信息
+	 * 
+	 */
+	public int deletUserVirtualByIds(@Param("ids")String ids);
+}

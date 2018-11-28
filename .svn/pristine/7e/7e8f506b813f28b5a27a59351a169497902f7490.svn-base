@@ -1,0 +1,67 @@
+package com.aotain.smmsapi.task.prevalidate.service.impl;
+
+import com.aotain.common.utils.redis.DataApproveUtil;
+import com.aotain.cu.serviceapi.model.*;
+import com.aotain.cu.serviceapi.utils.BaseFeignBuilder;
+import com.aotain.smmsapi.task.serviceapi.WriteProcessService;
+import com.aotain.smmsapi.task.serviceapi.WriteProcessServiceCallback;
+import com.aotain.smmsapi.task.utils.DateUtils;
+
+import java.util.Date;
+
+public class WriteApproveProcess {
+
+    static String RIBBON_CLIENT_NAME = "myclient";
+    static Integer APPROVE_TYPE_HOUSE=2;
+    static Integer APPROVE_TYPE_IDC=1;
+    static Integer APPROVE_TYPE_USER=3;
+    private WriteProcessService api;
+    private static volatile WriteApproveProcess instance = null;
+
+
+    private WriteApproveProcess(){
+        api = BaseFeignBuilder.getCacheFeign(WriteProcessService.class, RIBBON_CLIENT_NAME,new WriteProcessServiceCallback(), BaseFeignBuilder.EncodeDecodeType.EDT_JSON_JSON);
+    }
+
+    public static WriteApproveProcess getInstance(){
+        if (instance==null){
+            synchronized (WriteApproveProcess.class){
+                instance = new WriteApproveProcess();
+            }
+        }
+        return instance;
+    }
+
+    public void writeProcess( WaitApproveProcess waitApproveProcess ) {
+        Long approveId = DataApproveUtil.getInstance().getDataApprove(waitApproveProcess.getType()+"_"+waitApproveProcess.getDataId());
+        if (approveId!=null){
+            api.write(waitApproveProcess);
+        }
+    }
+
+    public void write( BaseModel baseModel ) {
+        Date date = new Date();
+        WaitApproveProcess process = new WaitApproveProcess();
+        process.setDealFlag(baseModel.getDealFlag());
+        process.setDealTime(DateUtils.getCurrentyyyMMddHHmmss());
+        process.setCreateTime(date);
+        process.setUpdateTime(date);
+        process.setCreateUser(Long.valueOf(baseModel.getCreateUserId()));
+        process.setWarnData(baseModel.getVerificationResult());
+        writeProcess(process);
+        if (baseModel instanceof IdcInformation){
+            IdcInformation idcInformation= (IdcInformation)baseModel;
+            process.setType(APPROVE_TYPE_IDC);
+            process.setDataId(Long.valueOf(idcInformation.getJyzId()));
+        }else if (baseModel instanceof HouseInformation){
+            HouseInformation houseInformation= (HouseInformation)baseModel;
+            process.setType(APPROVE_TYPE_HOUSE);
+            process.setDataId(Long.valueOf(houseInformation.getHouseId()));
+        }else if(baseModel instanceof UserInformation){
+            UserInformation userInformation= (UserInformation)baseModel;
+            process.setType(APPROVE_TYPE_USER);
+            process.setDataId(Long.valueOf(userInformation.getUserId()));
+        }
+    }
+
+}

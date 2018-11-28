@@ -1,0 +1,11 @@
+package com.aotain.smmsapi.task.prevalidate.mapper;
+
+import com.aotain.common.config.annotation.MyBatisDao;
+import com.aotain.cu.serviceapi.model.BaseModel;
+
+@MyBatisDao
+public interface PreCommonDao {
+
+    public void writeLog(BaseModel baseModel);
+
+}
